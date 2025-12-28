@@ -18,6 +18,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Build options
 option(FORMA_BUILD_TESTS "Build compile-time tests" ON)
 option(FORMA_BUILD_PLUGINS "Build bundled plugins" ON)
+option(FORMA_ENABLE_DOWNLOADS "Enable HTTP/HTTPS download support (requires libcurl)" OFF)
 
 # Compiler warnings - Always enabled, warnings are errors
 if(MSVC)
@@ -27,11 +28,52 @@ else()
 endif()
 
 # ============================================================================
+# CPM - CMake Package Manager
+# ============================================================================
+
+include(cmake/CPM.cmake)
+
+# ============================================================================
 # External Dependencies
 # ============================================================================
 
 # Bugspray testing framework
 add_subdirectory(external/bugspray EXCLUDE_FROM_ALL)
+
+# Optional: libcurl for download support
+if(FORMA_ENABLE_DOWNLOADS)
+    message(STATUS "Download support enabled - fetching libcurl")
+    
+    # libcurl - HTTP/HTTPS downloads
+    CPMAddPackage(
+        NAME curl
+        GITHUB_REPOSITORY curl/curl
+        GIT_TAG curl-8_5_0
+        OPTIONS
+            "BUILD_CURL_EXE OFF"
+            "BUILD_SHARED_LIBS OFF"
+            "CURL_USE_OPENSSL ON"
+            "HTTP_ONLY ON"
+            "CURL_DISABLE_LDAP ON"
+            "CURL_DISABLE_LDAPS ON"
+            "CURL_DISABLE_TELNET ON"
+            "CURL_DISABLE_DICT ON"
+            "CURL_DISABLE_FILE ON"
+            "CURL_DISABLE_TFTP ON"
+            "CURL_DISABLE_RTSP ON"
+            "CURL_DISABLE_POP3 ON"
+            "CURL_DISABLE_IMAP ON"
+            "CURL_DISABLE_SMTP ON"
+            "CURL_DISABLE_GOPHER ON"
+            "CURL_DISABLE_SMB ON"
+            "CURL_USE_LIBSSH2 OFF"
+            "CURL_USE_LIBPSL OFF"
+            "ENABLE_MANUAL OFF"
+    )
+    
+    # TODO: Add libarchive later for archive extraction
+    # For now, just provide download functionality
+endif()
 
 # ============================================================================
 # Core Library (Tokenizer, Parser, IR)
@@ -56,6 +98,27 @@ target_include_directories(forma_core INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core>
     $<INSTALL_INTERFACE:include/forma>
 )
+
+# ============================================================================
+# Download Utility Library (Optional)
+# ============================================================================
+if(FORMA_ENABLE_DOWNLOADS)
+    add_library(forma_download STATIC
+        src/core/download.cpp
+    )
+
+    target_link_libraries(forma_download
+        PUBLIC
+            CURL::libcurl
+    )
+
+    target_include_directories(forma_download PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+        $<INSTALL_INTERFACE:include/forma>
+    )
+    
+    message(STATUS "forma_download library enabled")
+endif()
 
 # ============================================================================
 # Component Tests (Unit tests within each component)
@@ -134,6 +197,13 @@ if(FORMA_BUILD_DEMOS)
     # Forma CLI Tool
     add_executable(forma forma.cpp)
     target_link_libraries(forma PRIVATE forma_core)
+    
+    # Conditionally link download support
+    if(FORMA_ENABLE_DOWNLOADS)
+        target_link_libraries(forma PRIVATE forma_download)
+        target_compile_definitions(forma PRIVATE FORMA_HAS_DOWNLOAD)
+    endif()
+    
     target_compile_features(forma PRIVATE cxx_std_20)
     
     # Parser Demo
