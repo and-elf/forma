@@ -91,7 +91,7 @@ struct FormaPluginDescriptor {
     uint32_t api_version;
     const char* name;
     const char* version;
-    PluginCapabilities capabilities;
+    // Capabilities are now defined in plugin.toml and verified via hash
     void (*register_plugin)(FormaHost*);
 };
 

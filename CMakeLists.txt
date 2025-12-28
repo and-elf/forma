@@ -69,6 +69,7 @@ if(FORMA_ENABLE_DOWNLOADS)
             "CURL_USE_LIBSSH2 OFF"
             "CURL_USE_LIBPSL OFF"
             "ENABLE_MANUAL OFF"
+            "CMAKE_POSITION_INDEPENDENT_CODE ON"
     )
     
     # TODO: Add libarchive later for archive extraction
@@ -115,6 +116,11 @@ if(FORMA_ENABLE_DOWNLOADS)
     target_include_directories(forma_download PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
         $<INSTALL_INTERFACE:include/forma>
+    )
+    
+    # Enable PIC for use in shared libraries (plugins)
+    set_target_properties(forma_download PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
     )
     
     message(STATUS "forma_download library enabled")

@@ -28,6 +28,15 @@ set_target_properties(forma_cmake_generator PROPERTIES
 
 target_link_libraries(forma_cmake_generator PUBLIC ${FORMA_CORE_TARGET})
 
+# Link with download support if available
+if(TARGET forma_download)
+    target_link_libraries(forma_cmake_generator PRIVATE forma_download)
+    target_compile_definitions(forma_cmake_generator PRIVATE FORMA_HAS_DOWNLOAD)
+    message(STATUS "CMake generator: Download support enabled")
+else()
+    message(STATUS "CMake generator: Download support disabled (build with -DFORMA_ENABLE_DOWNLOADS=ON to enable)")
+endif()
+
 target_include_directories(forma_cmake_generator PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include/forma/plugins/cmake-generator>
