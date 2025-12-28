@@ -45,18 +45,10 @@ struct RendererCapabilities {
   bool has_pointer_input;
   bool has_font_metrics;
 };
-struct PluginCapabilities {
-    bool supports_renderer;
-    bool supports_theme;
-    bool supports_audio;
-    bool supports_build;
-    
-    // Renderer callback: render(doc, input_path, output_path) -> success
-    bool (*render)(const void* doc, const char* input_path, const char* output_path);
-    
-    // Output file extension for renderer (e.g., ".c", ".cpp", ".js")
-    const char* output_extension;
-};
+
+// Note: Plugin capabilities are now defined in plugin.toml
+// This struct is kept for backward compatibility with other parts of the system
+// but plugin loading now uses TOML metadata instead
 
 
 struct RendererVTable {

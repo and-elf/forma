@@ -7,39 +7,21 @@
 #include <cstring>
 #include <cstdint>
 #include <memory>
+#include "plugin_metadata.hpp"
 
 namespace forma {
 
-// Plugin descriptor structure (minimal version for loading)
-struct PluginCapabilities {
-    bool supports_renderer;
-    bool supports_theme;
-    bool supports_audio;
-    bool supports_build;
-    
-    // Renderer callback: render(doc, input_path, output_path) -> success
+// Plugin function pointers loaded from dynamic library
+struct PluginFunctions {
     bool (*render)(const void* doc, const char* input_path, const char* output_path);
-    
-    // Output file extension for renderer (e.g., ".c", ".cpp", ".js")
-    const char* output_extension;
+    void (*register_plugin)(void* host);  // Optional
 };
-
-struct FormaPluginDescriptor {
-    uint32_t api_version;
-    const char* name;
-    const char* version;
-    PluginCapabilities capabilities;
-    void* register_plugin;  // Function pointer
-};
-
-// ============================================================================
-// Dynamic Plugin Loader
-// ============================================================================
 
 struct LoadedPlugin {
     void* handle = nullptr;
-    FormaPluginDescriptor* descriptor = nullptr;
+    PluginFunctions functions;
     std::string path;
+    std::unique_ptr<PluginMetadata> metadata;  // Loaded from plugin.toml
     
     ~LoadedPlugin() {
         if (handle) {
@@ -67,41 +49,50 @@ public:
         // Clear any existing error
         dlerror();
         
-        // Look for the plugin initialization function
-        typedef FormaPluginDescriptor* (*GetPluginDescriptorFunc)();
-        GetPluginDescriptorFunc get_descriptor = 
-            reinterpret_cast<GetPluginDescriptorFunc>(
-                dlsym(handle, "forma_get_plugin_descriptor")
-            );
+        // Look for the forma_render function (required)
+        typedef bool (*RenderFunc)(const void*, const char*, const char*);
+        RenderFunc render_fn = reinterpret_cast<RenderFunc>(dlsym(handle, "forma_render"));
         
         const char* dlsym_error = dlerror();
-        if (dlsym_error) {
-            error_msg = std::string("Cannot find forma_get_plugin_descriptor: ") + dlsym_error;
+        if (dlsym_error || !render_fn) {
+            error_msg = std::string("Cannot find forma_render function: ") + (dlsym_error ? dlsym_error : "symbol not found");
             dlclose(handle);
             return false;
         }
         
-        // Get the plugin descriptor
-        FormaPluginDescriptor* descriptor = get_descriptor();
-        if (!descriptor) {
-            error_msg = "Plugin descriptor is null";
+        // Look for optional forma_register function
+        typedef void (*RegisterFunc)(void*);
+        RegisterFunc register_fn = reinterpret_cast<RegisterFunc>(dlsym(handle, "forma_register"));
+        dlerror(); // Clear error (it's optional)
+        
+        // Try to load plugin metadata from plugin.toml
+        auto toml_path = find_plugin_toml(path);
+        auto metadata = toml_path.empty() ? nullptr : load_plugin_metadata(toml_path);
+        
+        if (!metadata) {
+            error_msg = "Plugin metadata (plugin.toml) not found for: " + path;
             dlclose(handle);
             return false;
         }
         
-        // Validate API version
-        if (descriptor->api_version != 1) {
-            error_msg = std::string("Incompatible API version: expected 1, got ") + 
-                       std::to_string(descriptor->api_version);
+        // Validate API version from metadata
+        if (metadata->api_version != "1.0.0") {
+            error_msg = std::string("Incompatible API version: expected 1.0.0, got ") + metadata->api_version;
             dlclose(handle);
             return false;
         }
         
         // Store the loaded plugin
-        loaded_plugins.push_back(std::make_unique<LoadedPlugin>(LoadedPlugin{handle, descriptor, path}));
+        auto loaded = std::make_unique<LoadedPlugin>();
+        loaded->handle = handle;
+        loaded->functions.render = render_fn;
+        loaded->functions.register_plugin = register_fn;
+        loaded->path = path;
+        loaded->metadata = std::move(metadata);
+        loaded_plugins.push_back(std::move(loaded));
         
-        // Register the plugin if it has a registration function
-        if (descriptor->register_plugin) {
+        // Call registration function if available
+        if (register_fn) {
             // TODO: Create FormaHost instance and pass it
             // For now, just acknowledge the plugin is loaded
         }
@@ -109,21 +100,32 @@ public:
         return true;
     }
     
-    // Register a built-in (statically-linked) plugin
-    void register_builtin_plugin(FormaPluginDescriptor* descriptor, const std::string& name) {
-        if (!descriptor) {
+    // Register a built-in (statically-linked) plugin with metadata
+    void register_builtin_plugin(
+        bool (*render_fn)(const void*, const char*, const char*),
+        void (*register_fn)(void*),
+        std::unique_ptr<PluginMetadata> metadata) {
+        
+        if (!render_fn || !metadata) {
+            std::cerr << "Warning: Built-in plugin missing render function or metadata\n";
             return;
         }
         
         // Validate API version
-        if (descriptor->api_version != 1) {
-            std::cerr << "Warning: Built-in plugin " << name 
-                      << " has incompatible API version: " << descriptor->api_version << std::endl;
+        if (metadata->api_version != "1.0.0") {
+            std::cerr << "Warning: Built-in plugin " << metadata->name
+                      << " has incompatible API version: " << metadata->api_version << std::endl;
             return;
         }
         
         // Create a LoadedPlugin entry without a dynamic library handle
-        loaded_plugins.push_back(std::make_unique<LoadedPlugin>(LoadedPlugin{nullptr, descriptor, "builtin:" + name}));
+        auto loaded = std::make_unique<LoadedPlugin>();
+        loaded->handle = nullptr;
+        loaded->functions.render = render_fn;
+        loaded->functions.register_plugin = register_fn;
+        loaded->path = "builtin:" + metadata->name;
+        loaded->metadata = std::move(metadata);
+        loaded_plugins.push_back(std::move(loaded));
     }
     
     // Get all loaded plugins
@@ -134,8 +136,7 @@ public:
     // Get plugin by name
     LoadedPlugin* find_plugin(const std::string& name) {
         for (auto& plugin : loaded_plugins) {
-            if (plugin->descriptor && 
-                std::string(plugin->descriptor->name) == name) {
+            if (plugin->metadata && plugin->metadata->name == name) {
                 return plugin.get();
             }
         }
@@ -151,24 +152,25 @@ public:
         
         out << "Loaded plugins:\n";
         for (const auto& plugin : loaded_plugins) {
-            if (plugin->descriptor) {
-                out << "  - " << plugin->descriptor->name 
-                    << " v" << plugin->descriptor->version;
+            if (plugin->metadata) {
+                out << "  - " << plugin->metadata->name 
+                    << " v" << plugin->metadata->api_version;
                 
-                // Show capabilities
-                std::vector<std::string> caps;
-                if (plugin->descriptor->capabilities.supports_renderer) caps.push_back("renderer");
-                if (plugin->descriptor->capabilities.supports_theme) caps.push_back("theme");
-                if (plugin->descriptor->capabilities.supports_audio) caps.push_back("audio");
-                if (plugin->descriptor->capabilities.supports_build) caps.push_back("build");
-                
-                if (!caps.empty()) {
-                    out << " [";
-                    for (size_t i = 0; i < caps.size(); ++i) {
-                        out << caps[i];
-                        if (i < caps.size() - 1) out << ", ";
+                // Show capabilities from metadata
+                if (!plugin->metadata->provides.empty()) {
+                    out << " [" << plugin->metadata->kind << "]";
+                    out << "\n    Provides: ";
+                    for (size_t i = 0; i < plugin->metadata->provides.size(); ++i) {
+                        out << plugin->metadata->provides[i];
+                        if (i < plugin->metadata->provides.size() - 1) out << ", ";
                     }
-                    out << "]";
+                    if (!plugin->metadata->output_extension.empty()) {
+                        out << "\n    Output: " << plugin->metadata->output_extension 
+                            << " (" << plugin->metadata->output_language << ")";
+                    }
+                } else {
+                    // No capabilities listed
+                    out << " [" << plugin->metadata->kind << "]";
                 }
                 
                 out << "\n    Path: " << plugin->path << "\n";

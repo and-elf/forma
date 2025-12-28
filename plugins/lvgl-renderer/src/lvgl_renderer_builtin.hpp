@@ -9,8 +9,8 @@
 
 namespace forma::lvgl {
 
-// Render callback implementation for built-in plugin
-static bool lvgl_builtin_render(const void* doc_ptr, const char* input_path, const char* output_path) {
+// Render function for built-in plugin (exported directly, no descriptor needed)
+bool lvgl_builtin_render(const void* doc_ptr, const char* input_path, const char* output_path) {
     (void)input_path; // Unused
     
     if (!doc_ptr || !output_path) {
@@ -46,27 +46,6 @@ static bool lvgl_builtin_render(const void* doc_ptr, const char* input_path, con
         std::cerr << "[LVGL Renderer] Error: " << e.what() << "\n";
         return false;
     }
-}
-
-// Built-in plugin descriptor
-static forma::FormaPluginDescriptor lvgl_builtin_descriptor = {
-    .api_version = 1,
-    .name = "lvgl",
-    .version = "1.0.0-builtin",
-    .capabilities = {
-        .supports_renderer = true,
-        .supports_theme = false,
-        .supports_audio = false,
-        .supports_build = false,
-        .render = lvgl_builtin_render,
-        .output_extension = ".c"
-    },
-    .register_plugin = nullptr
-};
-
-// Get the built-in plugin descriptor
-inline forma::FormaPluginDescriptor* get_builtin_descriptor() {
-    return &lvgl_builtin_descriptor;
 }
 
 } // namespace forma::lvgl

@@ -114,15 +114,12 @@ int load_plugins(forma::PluginLoader& plugin_loader, const std::vector<std::stri
             return 1;
         }
         
-        auto* loaded = plugin_loader.find_plugin("");
-        if (loaded && loaded->descriptor) {
-            tracer.info(std::string("✓ Loaded plugin: ") + loaded->descriptor->name + 
-                       " v" + loaded->descriptor->version);
-            
-            // TODO: Check if this is a tracer plugin and switch to it
-            // For now, tracer plugins aren't supported yet
-            (void)active_tracer; // Suppress unused warning
-        }
+        // Plugin loaded successfully - metadata is available
+        tracer.info(std::string("✓ Loaded plugin from: ") + plugin_path);
+        
+        // TODO: Check if this is a tracer plugin and switch to it
+        // For now, tracer plugins aren't supported yet
+        (void)active_tracer; // Suppress unused warning
     }
     
     return 0;
@@ -293,8 +290,8 @@ int generate_code(const DocType& doc, const std::string& input_file,
     // Check renderer selection before code generation
     std::vector<std::string> available_renderers;
     for (const auto& plugin : plugin_loader.get_loaded_plugins()) {
-        if (plugin->descriptor && plugin->descriptor->capabilities.supports_renderer) {
-            available_renderers.push_back(plugin->descriptor->name);
+        if (plugin->metadata && plugin->metadata->is_renderer()) {
+            available_renderers.push_back(plugin->metadata->name);
         }
     }
     
@@ -335,9 +332,9 @@ int generate_code(const DocType& doc, const std::string& input_file,
     // Find matching renderer plugin (exact name match)
     forma::LoadedPlugin* selected_plugin = nullptr;
     for (const auto& plugin : plugin_loader.get_loaded_plugins()) {
-        if (plugin->descriptor && 
-            plugin->descriptor->capabilities.supports_renderer &&
-            plugin->descriptor->name == target_renderer) {
+        if (plugin->metadata && 
+            plugin->metadata->is_renderer() &&
+            plugin->metadata->name == target_renderer) {
             selected_plugin = plugin.get();
             break;
         }
@@ -345,19 +342,21 @@ int generate_code(const DocType& doc, const std::string& input_file,
     
     // Use plugin renderer if found
     if (selected_plugin) {
-        tracer.verbose(std::string("Using plugin renderer: ") + selected_plugin->descriptor->name);
+        tracer.verbose(std::string("Using plugin renderer: ") + selected_plugin->metadata->name);
         
-        // Get output extension from plugin (default to .gen if not specified)
-        std::string extension = selected_plugin->descriptor->capabilities.output_extension 
-            ? selected_plugin->descriptor->capabilities.output_extension 
-            : ".gen";
+        // Get output extension from metadata
+        std::string extension = ".gen";  // default fallback
+        if (!selected_plugin->metadata->output_extension.empty()) {
+            extension = selected_plugin->metadata->output_extension;
+            tracer.verbose(std::string("Using output extension from metadata: ") + extension);
+        }
         output_file += extension;
         
         tracer.verbose(std::string("Output: ") + output_file);
         
-        // Call plugin's render callback
-        if (selected_plugin->descriptor->capabilities.render) {
-            bool success = selected_plugin->descriptor->capabilities.render(
+        // Call plugin's render function
+        if (selected_plugin->functions.render) {
+            bool success = selected_plugin->functions.render(
                 &doc, input_file.c_str(), output_file.c_str()
             );
             
@@ -424,10 +423,21 @@ int main(int argc, char* argv[]) {
     forma::PluginLoader plugin_loader;
     forma::tracer::TracerPlugin* active_tracer = &tracer;
     
-    // Register built-in LVGL renderer plugin
+    // Register built-in LVGL renderer plugin with inline metadata
+    // (since TOML parser is currently disabled)
+    auto lvgl_metadata = std::make_unique<forma::PluginMetadata>();
+    lvgl_metadata->name = "lvgl";
+    lvgl_metadata->kind = "renderer";
+    lvgl_metadata->api_version = "1.0.0";
+    lvgl_metadata->runtime = "native";
+    lvgl_metadata->provides = {"renderer:lvgl", "renderer:c", "widgets:basic", "widgets:lvgl", "animation", "events", "layouts"};
+    lvgl_metadata->output_extension = ".c";
+    lvgl_metadata->output_language = "c";
+    
     plugin_loader.register_builtin_plugin(
-        forma::lvgl::get_builtin_descriptor(),
-        "lvgl"
+        forma::lvgl::lvgl_builtin_render,
+        nullptr,
+        std::move(lvgl_metadata)
     );
     
     if (load_plugins(plugin_loader, opts.plugins, active_tracer) != 0) {

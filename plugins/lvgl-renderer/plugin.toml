@@ -1,0 +1,24 @@
+# LVGL Renderer Plugin Configuration
+
+[plugin]
+name = "lvgl"
+kind = "renderer"
+api_version = "1.0.0"
+runtime = "native"
+
+[capabilities]
+provides = [
+    "renderer:lvgl",
+    "renderer:c",
+    "widgets:basic",
+    "widgets:lvgl",
+    "animation",
+    "events",
+    "layouts"
+]
+
+requires = []
+
+[renderer]
+output_extension = ".c"
+output_language = "c"
