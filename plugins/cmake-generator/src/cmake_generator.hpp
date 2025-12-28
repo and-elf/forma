@@ -4,6 +4,7 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
+#include <memory>
 
 struct CMakeGeneratorConfig {
     std::string project_name;
@@ -74,7 +75,7 @@ namespace cmake_vtable {
 }
 
 // Global instance for vtable callbacks
-extern CMakeGenerator* g_cmake_generator;
+extern std::unique_ptr<CMakeGenerator> g_cmake_generator;
 
 // VTable instance
 extern BuildVTable cmake_build_vtable;

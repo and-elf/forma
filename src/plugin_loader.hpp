@@ -6,6 +6,7 @@
 #include <iostream>
 #include <cstring>
 #include <cstdint>
+#include <memory>
 
 namespace forma {
 
@@ -49,14 +50,10 @@ struct LoadedPlugin {
 
 class PluginLoader {
 private:
-    std::vector<LoadedPlugin*> loaded_plugins;
+    std::vector<std::unique_ptr<LoadedPlugin>> loaded_plugins;
     
 public:
-    ~PluginLoader() {
-        for (auto* plugin : loaded_plugins) {
-            delete plugin;
-        }
-    }
+    ~PluginLoader() = default;
     
     // Load a plugin from a shared library (.so file)
     bool load_plugin(const std::string& path, std::string& error_msg) {
@@ -101,8 +98,7 @@ public:
         }
         
         // Store the loaded plugin
-        auto* loaded = new LoadedPlugin{handle, descriptor, path};
-        loaded_plugins.push_back(loaded);
+        loaded_plugins.push_back(std::make_unique<LoadedPlugin>(LoadedPlugin{handle, descriptor, path}));
         
         // Register the plugin if it has a registration function
         if (descriptor->register_plugin) {
@@ -127,21 +123,20 @@ public:
         }
         
         // Create a LoadedPlugin entry without a dynamic library handle
-        auto* loaded = new LoadedPlugin{nullptr, descriptor, "builtin:" + name};
-        loaded_plugins.push_back(loaded);
+        loaded_plugins.push_back(std::make_unique<LoadedPlugin>(LoadedPlugin{nullptr, descriptor, "builtin:" + name}));
     }
     
     // Get all loaded plugins
-    const std::vector<LoadedPlugin*>& get_loaded_plugins() const {
+    const std::vector<std::unique_ptr<LoadedPlugin>>& get_loaded_plugins() const {
         return loaded_plugins;
     }
     
     // Get plugin by name
     LoadedPlugin* find_plugin(const std::string& name) {
-        for (auto* plugin : loaded_plugins) {
+        for (auto& plugin : loaded_plugins) {
             if (plugin->descriptor && 
                 std::string(plugin->descriptor->name) == name) {
-                return plugin;
+                return plugin.get();
             }
         }
         return nullptr;
@@ -155,7 +150,7 @@ public:
         }
         
         out << "Loaded plugins:\n";
-        for (const auto* plugin : loaded_plugins) {
+        for (const auto& plugin : loaded_plugins) {
             if (plugin->descriptor) {
                 out << "  - " << plugin->descriptor->name 
                     << " v" << plugin->descriptor->version;

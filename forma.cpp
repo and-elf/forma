@@ -292,7 +292,7 @@ int generate_code(const DocType& doc, const std::string& input_file,
                   forma::tracer::TracerPlugin& tracer) {
     // Check renderer selection before code generation
     std::vector<std::string> available_renderers;
-    for (const auto* plugin : plugin_loader.get_loaded_plugins()) {
+    for (const auto& plugin : plugin_loader.get_loaded_plugins()) {
         if (plugin->descriptor && plugin->descriptor->capabilities.supports_renderer) {
             available_renderers.push_back(plugin->descriptor->name);
         }
@@ -334,11 +334,11 @@ int generate_code(const DocType& doc, const std::string& input_file,
     
     // Find matching renderer plugin (exact name match)
     forma::LoadedPlugin* selected_plugin = nullptr;
-    for (const auto* plugin : plugin_loader.get_loaded_plugins()) {
+    for (const auto& plugin : plugin_loader.get_loaded_plugins()) {
         if (plugin->descriptor && 
             plugin->descriptor->capabilities.supports_renderer &&
             plugin->descriptor->name == target_renderer) {
-            selected_plugin = const_cast<forma::LoadedPlugin*>(plugin);
+            selected_plugin = plugin.get();
             break;
         }
     }

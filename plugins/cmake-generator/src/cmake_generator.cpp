@@ -4,9 +4,10 @@
 #include <filesystem>
 #include <iostream>
 #include <map>
+#include <memory>
 
 // Global instance
-CMakeGenerator* g_cmake_generator = nullptr;
+std::unique_ptr<CMakeGenerator> g_cmake_generator;
 
 // Cached cmake path
 static std::string g_cmake_path;
@@ -386,7 +387,7 @@ bool CMakeGenerator::run_cmake_build() {
 namespace cmake_vtable {
     void init(BuildContext* ctx) {
         if (!g_cmake_generator) {
-            g_cmake_generator = new CMakeGenerator();
+            g_cmake_generator = std::make_unique<CMakeGenerator>();
         }
         g_cmake_generator->init(ctx);
     }
@@ -418,8 +419,7 @@ namespace cmake_vtable {
     void shutdown() {
         if (g_cmake_generator) {
             g_cmake_generator->shutdown();
-            delete g_cmake_generator;
-            g_cmake_generator = nullptr;
+            g_cmake_generator.reset();
         }
     }
 }
