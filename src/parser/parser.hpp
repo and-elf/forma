@@ -190,6 +190,26 @@ constexpr MethodDecl parse_method(Parser& p) {
 constexpr TypeDecl parse_type_decl(Parser& p) {
     TypeDecl decl;
     
+    // Check for @requires annotation
+    if (p.accept(TokenKind::At)) {
+        p.expect(TokenKind::Requires);
+        p.expect(TokenKind::LParen);
+        
+        // Parse comma-separated list of capabilities
+        while (!p.check(TokenKind::RParen) && !p.check(TokenKind::EndOfFile)) {
+            if (decl.required_capabilities_count < decl.required_capabilities.size()) {
+                decl.required_capabilities[decl.required_capabilities_count++] = 
+                    p.expect(TokenKind::Identifier).text;
+            }
+            
+            if (!p.accept(TokenKind::Comma)) {
+                break;
+            }
+        }
+        
+        p.expect(TokenKind::RParen);
+    }
+    
     // Optional 'class' keyword
     p.accept(TokenKind::Class);
     

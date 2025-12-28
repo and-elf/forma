@@ -24,6 +24,7 @@ enum class TokenKind {
     RBrace,
     LParen,
     RParen,
+    At,  // @ for annotations
 
     // operators
     Plus,
@@ -52,6 +53,7 @@ enum class TokenKind {
     Or,
     Class,
     Animate,
+    Requires,  // @requires annotation
 
     // misc
     EndOfFile,
@@ -142,6 +144,7 @@ constexpr Tok next_token(Lexer& l) {
         case ',': return {TokenKind::Comma, ",", start};
         case '(': return {TokenKind::LParen, "(", start};
         case ')': return {TokenKind::RParen, ")", start};
+        case '@': return {TokenKind::At, "@", start};
         case '"': {
             while (l.peek() && l.peek() != '"') l.advance();
             l.advance(); // closing "
@@ -182,6 +185,8 @@ constexpr Tok next_token(Lexer& l) {
             return {TokenKind::Class, text, start};
         if (text == "animate")
             return {TokenKind::Animate, text, start};
+        if (text == "requires")
+            return {TokenKind::Requires, text, start};
         return {TokenKind::Identifier, text, start};
     }
 

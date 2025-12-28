@@ -6,7 +6,11 @@
 
 <DottedIdentifier> ::= <Identifier> { "." <Identifier> }
 
-<TypeDecl> ::= "class" <Identifier> "{" { <MemberDecl> } "}"
+<TypeDecl> ::= <Annotation>? "class" <Identifier> "{" { <MemberDecl> } "}"
+
+<Annotation> ::= "@requires" "(" <IdentifierList> ")"
+
+<IdentifierList> ::= <Identifier> { "," <Identifier> }
 
 <MemberDecl> ::= <PropertyDecl>
                | <EventDecl>
@@ -104,3 +108,39 @@
 
 <StringLiteral> ::= '"' { character } '"'
 ```
+
+## Annotations
+
+### `@requires` Annotation
+
+The `@requires` annotation declares renderer capabilities that a type depends on. It must appear before the `class` keyword.
+
+**Syntax:**
+```
+@requires(capability1, capability2, ...)
+class TypeName {
+  ...
+}
+```
+
+**Example:**
+```
+@requires(widgets)
+class Slider {
+  property Float value: 0.0;
+}
+
+@requires(animation, touch)
+class GestureButton {
+  property String label: "";
+}
+```
+
+**Common Capabilities:**
+- `widgets` - Standard UI controls (buttons, sliders, text inputs)
+- `animation` - Animation and transition support
+- `touch` - Touch and gesture input handling
+- `graphics` - Custom graphics and drawing operations
+- `layout` - Advanced layout features
+
+When a type with `@requires` is instantiated, the renderer must provide all specified capabilities or produce an error.

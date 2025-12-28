@@ -62,6 +62,10 @@ struct TypeDecl {
     size_t prop_count = 0;
     std::array<MethodDecl, 8> methods{};
     size_t method_count = 0;
+    
+    // Capabilities required by this type (e.g., @requires(widgets, animation))
+    std::array<std::string_view, 8> required_capabilities{};
+    size_t required_capabilities_count = 0;
 };
 
 // Enum value
