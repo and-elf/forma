@@ -1,11 +1,12 @@
 #include "download.hpp"
+#include "archive.hpp"
 #include <curl/curl.h>
 #include <fstream>
 #include <filesystem>
 #include <iostream>
 #include <cstring>
-
-// TODO: Add libarchive support for extract_archive() and download_and_extract()
+#include <algorithm>
+#include <ctime>
 
 namespace forma::download {
 
@@ -154,25 +155,68 @@ std::optional<std::string> download_to_memory(const std::string& url, const Down
 
 bool extract_archive(const std::string& archive_path, const std::string& output_dir, 
                     int strip_components) {
-    (void)archive_path;
-    (void)output_dir;
-    (void)strip_components;
+    archive::ExtractOptions opts;
+    opts.strip_components = strip_components;
+    opts.create_dest_dir = true;
+    opts.overwrite = true;
     
-    // TODO: Implement with libarchive
-    std::cerr << "extract_archive() not yet implemented - libarchive support pending\n";
-    return false;
+    auto result = archive::extract_archive(archive_path, output_dir, opts);
+    
+    if (!result.success) {
+        std::cerr << "Archive extraction failed: " << result.error_message << "\n";
+        return false;
+    }
+    
+    return true;
 }
 
 bool download_and_extract(const std::string& url, const std::string& output_dir,
                          int strip_components, const DownloadOptions& options) {
-    (void)url;
-    (void)output_dir;
-    (void)strip_components;
-    (void)options;
+    // Download to temporary file
+    namespace fs = std::filesystem;
+    fs::path temp_dir = fs::temp_directory_path();
+    fs::path temp_file = temp_dir / ("forma_download_" + std::to_string(std::time(nullptr)));
     
-    // TODO: Implement with libarchive
-    std::cerr << "download_and_extract() not yet implemented - libarchive support pending\n";
-    return false;
+    // Determine file extension from URL
+    std::string url_lower = url;
+    std::transform(url_lower.begin(), url_lower.end(), url_lower.begin(), ::tolower);
+    
+    if (url_lower.find(".tar.gz") != std::string::npos || url_lower.find(".tgz") != std::string::npos) {
+        temp_file += ".tar.gz";
+    } else if (url_lower.find(".tar.bz2") != std::string::npos || url_lower.find(".tbz2") != std::string::npos) {
+        temp_file += ".tar.bz2";
+    } else if (url_lower.find(".tar.xz") != std::string::npos || url_lower.find(".txz") != std::string::npos) {
+        temp_file += ".tar.xz";
+    } else if (url_lower.find(".zip") != std::string::npos) {
+        temp_file += ".zip";
+    } else if (url_lower.find(".7z") != std::string::npos) {
+        temp_file += ".7z";
+    } else {
+        temp_file += ".archive";
+    }
+    
+    // Download the archive
+    std::cout << "Downloading archive from " << url << "...\n";
+    auto result = download_file(url, temp_file.string(), options);
+    
+    if (!result.success) {
+        std::cerr << "Download failed: " << result.error_message << "\n";
+        return false;
+    }
+    
+    std::cout << "Download complete, extracting...\n";
+    
+    // Extract the archive
+    bool extract_ok = extract_archive(temp_file.string(), output_dir, strip_components);
+    
+    // Clean up temp file
+    try {
+        fs::remove(temp_file);
+    } catch (...) {
+        std::cerr << "Warning: Failed to remove temporary file: " << temp_file << "\n";
+    }
+    
+    return extract_ok;
 }
 
 } // namespace forma::download

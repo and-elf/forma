@@ -72,8 +72,21 @@ if(FORMA_ENABLE_DOWNLOADS)
             "CMAKE_POSITION_INDEPENDENT_CODE ON"
     )
     
-    # TODO: Add libarchive later for archive extraction
-    # For now, just provide download functionality
+    # libarchive - Archive extraction
+    CPMAddPackage(
+        NAME libarchive
+        GITHUB_REPOSITORY libarchive/libarchive
+        GIT_TAG v3.7.2
+        OPTIONS
+            "ENABLE_TEST OFF"
+            "ENABLE_TAR OFF"
+            "ENABLE_CPIO OFF"
+            "ENABLE_CAT OFF"
+            "ENABLE_INSTALL OFF"
+            "CMAKE_POSITION_INDEPENDENT_CODE ON"
+            "CMAKE_C_FLAGS -w"
+            "CMAKE_CXX_FLAGS -w"
+    )
 endif()
 
 # ============================================================================
@@ -101,6 +114,38 @@ target_include_directories(forma_core INTERFACE
 )
 
 # ============================================================================
+# Archive Utility Library (Optional)
+# ============================================================================
+if(FORMA_ENABLE_DOWNLOADS)
+    add_library(forma_archive STATIC
+        src/core/archive.cpp
+    )
+
+    target_link_libraries(forma_archive
+        PUBLIC
+            archive_static
+    )
+
+    target_include_directories(forma_archive PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+        $<INSTALL_INTERFACE:include/forma>
+    )
+    
+    # Add libarchive include directories
+    target_include_directories(forma_archive PRIVATE
+        ${CMAKE_BINARY_DIR}/_deps/libarchive-src/libarchive
+        ${CMAKE_BINARY_DIR}/_deps/libarchive-build
+    )
+    
+    # Enable PIC for use in shared libraries (plugins)
+    set_target_properties(forma_archive PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+    )
+    
+    message(STATUS "forma_archive library enabled")
+endif()
+
+# ============================================================================
 # Download Utility Library (Optional)
 # ============================================================================
 if(FORMA_ENABLE_DOWNLOADS)
@@ -111,6 +156,7 @@ if(FORMA_ENABLE_DOWNLOADS)
     target_link_libraries(forma_download
         PUBLIC
             CURL::libcurl
+            forma_archive
     )
 
     target_include_directories(forma_download PUBLIC

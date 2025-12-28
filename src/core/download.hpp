@@ -68,7 +68,7 @@ std::optional<std::string> download_to_memory(
 
 /**
  * Extract an archive to a directory
- * Supports: .tar.gz, .tar.bz2, .tar.xz, .zip
+ * Supports: .tar.gz, .tar.bz2, .tar.xz, .zip, .7z
  * 
  * @param archive_path Path to archive file
  * @param output_dir Directory to extract to (created if doesn't exist)
@@ -83,6 +83,7 @@ bool extract_archive(
 
 /**
  * Download and extract an archive in one operation
+ * Archive file is automatically deleted after extraction
  * 
  * @param url Archive URL
  * @param output_dir Extraction directory
