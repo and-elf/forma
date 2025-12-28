@@ -23,6 +23,7 @@ struct CompilerOptions {
     std::string mode = "compile";
     std::string renderer;
     std::vector<std::string> plugins;
+    std::vector<std::string> plugin_dirs;
     std::string project_path;
     std::string build_system;
     std::string target_triple;
@@ -42,6 +43,7 @@ void print_usage(const char* program_name) {
     std::cout << "  --mode <mode>        Execution mode: compile, lsp, repl, init\n";
     std::cout << "  --renderer <name>    Renderer backend: js, sdl, lvgl, vulkan\n";
     std::cout << "  --plugin <path>      Load plugin from shared library (.so)\n";
+    std::cout << "  --plugin-dir <path>  Load all plugins from directory\n";
     std::cout << "  --list-plugins       List all loaded plugins\n";
     std::cout << "  --project <path>     Project directory\n";
     std::cout << "  --build <system>     Build system: cmake, meson, bazel\n";
@@ -85,6 +87,8 @@ CompilerOptions parse_arguments(int argc, char* argv[]) {
             opts.renderer = argv[++i];
         } else if (arg == "--plugin" && i + 1 < argc) {
             opts.plugins.push_back(argv[++i]);
+        } else if (arg == "--plugin-dir" && i + 1 < argc) {
+            opts.plugin_dirs.push_back(argv[++i]);
         } else if (arg == "--project" && i + 1 < argc) {
             opts.project_path = argv[++i];
         } else if (arg == "--build" && i + 1 < argc) {
@@ -120,6 +124,28 @@ int load_plugins(forma::PluginLoader& plugin_loader, const std::vector<std::stri
         // TODO: Check if this is a tracer plugin and switch to it
         // For now, tracer plugins aren't supported yet
         (void)active_tracer; // Suppress unused warning
+    }
+    
+    return 0;
+}
+
+int load_plugin_directories(forma::PluginLoader& plugin_loader, const std::vector<std::string>& plugin_dirs) {
+    auto& tracer = forma::tracer::get_tracer();
+    
+    for (const auto& dir_path : plugin_dirs) {
+        tracer.verbose(std::string("Loading plugins from directory: ") + dir_path);
+        
+        std::vector<std::string> errors;
+        int loaded_count = plugin_loader.load_plugins_from_directory(dir_path, errors);
+        
+        if (loaded_count > 0) {
+            tracer.info(std::string("✓ Loaded ") + std::to_string(loaded_count) + " plugin(s) from: " + dir_path);
+        }
+        
+        // Report any errors
+        for (const auto& error : errors) {
+            tracer.error(error);
+        }
     }
     
     return 0;
@@ -441,6 +467,10 @@ int main(int argc, char* argv[]) {
     );
     
     if (load_plugins(plugin_loader, opts.plugins, active_tracer) != 0) {
+        return 1;
+    }
+    
+    if (load_plugin_directories(plugin_loader, opts.plugin_dirs) != 0) {
         return 1;
     }
     

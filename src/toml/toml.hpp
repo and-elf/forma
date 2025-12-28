@@ -176,7 +176,7 @@ public:
     }
     
     constexpr void skip_whitespace() {
-        while (pos < input.size() && (input[pos] == ' ' || input[pos] == '\t' || input[pos] == '\r')) {
+        while (pos < input.size() && (input[pos] == ' ' || input[pos] == '\t' || input[pos] == '\r' || input[pos] == '\n')) {
             pos++;
         }
     }
@@ -185,7 +185,9 @@ public:
         while (pos < input.size() && input[pos] != '\n') {
             pos++;
         }
-        if (pos < input.size()) pos++; // Skip the newline
+        if (pos < input.size() && input[pos] == '\n') {
+            pos++; // Skip the newline
+        }
     }
     
     constexpr bool is_digit(char c) const {
@@ -363,6 +365,7 @@ public:
         Table<32>* current_table = &doc.root;
         
         while (pos < input.size()) {
+            size_t last_pos = pos;  // Track position to detect infinite loops
             skip_whitespace();
             
             if (peek() == '\0') break;
@@ -400,6 +403,11 @@ public:
             }
             
             skip_line();
+            
+            // Safety check: if position hasn't advanced, force advance to prevent infinite loop
+            if (pos == last_pos && pos < input.size()) {
+                pos++;
+            }
         }
         
         return doc;

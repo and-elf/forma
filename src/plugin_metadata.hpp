@@ -45,27 +45,18 @@ struct PluginMetadata {
     }
 };
 
-// Load plugin metadata from a plugin.toml file
-inline std::unique_ptr<PluginMetadata> load_plugin_metadata(const std::filesystem::path& toml_path) {
-    if (!std::filesystem::exists(toml_path)) {
+// Load plugin metadata from a TOML string (embedded in plugin binary)
+inline std::unique_ptr<PluginMetadata> load_plugin_metadata_from_string(const char* toml_str) {
+    if (!toml_str) {
         return nullptr;
     }
     
-    // Read the TOML file
-    std::ifstream file(toml_path);
-    if (!file) {
-        return nullptr;
-    }
-    
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string content = buffer.str();
-    
+    std::string content(toml_str);
     if (content.empty()) {
         return nullptr;
     }
     
-    // Parse TOML - wrap in try-catch in case of parse errors
+    // Parse TOML
     try {
         auto doc = forma::toml::parse(content);
         
@@ -131,6 +122,29 @@ inline std::unique_ptr<PluginMetadata> load_plugin_metadata(const std::filesyste
         // If TOML parsing fails, return nullptr
         return nullptr;
     }
+}
+
+// Load plugin metadata from a plugin.toml file
+inline std::unique_ptr<PluginMetadata> load_plugin_metadata(const std::filesystem::path& toml_path) {
+    if (!std::filesystem::exists(toml_path)) {
+        return nullptr;
+    }
+    
+    // Read the TOML file
+    std::ifstream file(toml_path);
+    if (!file) {
+        return nullptr;
+    }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    if (content.empty()) {
+        return nullptr;
+    }
+    
+    return load_plugin_metadata_from_string(content.c_str());
 }
 
 // Find plugin.toml for a given plugin path

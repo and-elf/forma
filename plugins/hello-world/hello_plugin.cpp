@@ -1,44 +1,51 @@
 // Example Plugin: Hello World
 // Demonstrates dynamic plugin loading
 
+#include "../../src/plugin_hash.hpp"
 #include <cstdint>
 #include <iostream>
 
+// Plugin metadata hash - computed from plugin.toml at compile time
+constexpr std::string_view PLUGIN_TOML_CONTENT = R"(# Hello World Example Plugin
+
+[plugin]
+name = "hello-world"
+kind = "example"
+api_version = "1.0.0"
+runtime = "native"
+
+[capabilities]
+provides = [
+    "example",
+    "demo"
+]
+
+dependencies = []
+)";
+
+constexpr uint64_t METADATA_HASH = forma::fnv1a_hash(PLUGIN_TOML_CONTENT);
+
 extern "C" {
 
-struct PluginCapabilities {
-    bool supports_renderer;
-    bool supports_theme;
-    bool supports_audio;
-    bool supports_build;
-};
+// Plugin metadata hash (required)
+uint64_t forma_plugin_metadata_hash() {
+    return METADATA_HASH;
+}
 
-struct FormaPluginDescriptor {
-    uint32_t api_version;
-    const char* name;
-    const char* version;
-    PluginCapabilities capabilities;
-    void* register_plugin;
-};
+// Render function (required but does nothing for example plugin)
+bool forma_render(const void* doc_ptr, const char* input_path, const char* output_path) {
+    (void)doc_ptr;
+    (void)input_path;
+    (void)output_path;
+    
+    std::cout << "[Hello Plugin] Render called (but this is just an example plugin)\n";
+    return true;
+}
 
-// Plugin descriptor
-static FormaPluginDescriptor hello_plugin = {
-    .api_version = 1,
-    .name = "hello-world",
-    .version = "1.0.0",
-    .capabilities = {
-        .supports_renderer = false,
-        .supports_theme = false,
-        .supports_audio = false,
-        .supports_build = false
-    },
-    .register_plugin = nullptr
-};
-
-// Plugin initialization function (must be exported)
-FormaPluginDescriptor* forma_get_plugin_descriptor() {
-    std::cout << "[Hello Plugin] Initializing...\n";
-    return &hello_plugin;
+// Optional registration
+void forma_register(void* host) {
+    (void)host;
+    std::cout << "[Hello Plugin] Plugin registered!\n";
 }
 
 } // extern "C"

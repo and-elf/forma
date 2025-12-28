@@ -7,7 +7,9 @@
 #include <cstring>
 #include <cstdint>
 #include <memory>
+#include <filesystem>
 #include "plugin_metadata.hpp"
+#include "plugin_hash.hpp"
 
 namespace forma {
 
@@ -15,6 +17,7 @@ namespace forma {
 struct PluginFunctions {
     bool (*render)(const void* doc, const char* input_path, const char* output_path);
     void (*register_plugin)(void* host);  // Optional
+    uint64_t (*get_metadata_hash)();  // Required - returns hash of expected TOML
 };
 
 struct LoadedPlugin {
@@ -65,12 +68,48 @@ public:
         RegisterFunc register_fn = reinterpret_cast<RegisterFunc>(dlsym(handle, "forma_register"));
         dlerror(); // Clear error (it's optional)
         
-        // Try to load plugin metadata from plugin.toml
-        auto toml_path = find_plugin_toml(path);
-        auto metadata = toml_path.empty() ? nullptr : load_plugin_metadata(toml_path);
+        // Look for forma_plugin_metadata_hash function (required)
+        typedef uint64_t (*MetadataHashFunc)();
+        MetadataHashFunc hash_fn = reinterpret_cast<MetadataHashFunc>(dlsym(handle, "forma_plugin_metadata_hash"));
         
+        dlsym_error = dlerror();
+        if (dlsym_error || !hash_fn) {
+            error_msg = std::string("Cannot find forma_plugin_metadata_hash function: ") + (dlsym_error ? dlsym_error : "symbol not found");
+            dlclose(handle);
+            return false;
+        }
+        
+        // Get expected hash from plugin
+        uint64_t expected_hash = hash_fn();
+        
+        // Try to load plugin.toml from same directory as .so
+        auto toml_path = find_plugin_toml(path);
+        if (toml_path.empty()) {
+            error_msg = "Plugin metadata file (plugin.toml) not found for: " + path;
+            dlclose(handle);
+            return false;
+        }
+        
+        // Load and verify metadata
+        auto metadata = load_plugin_metadata(toml_path);
         if (!metadata) {
-            error_msg = "Plugin metadata (plugin.toml) not found for: " + path;
+            error_msg = "Failed to parse plugin metadata from: " + toml_path.string();
+            dlclose(handle);
+            return false;
+        }
+        
+        // Verify hash matches
+        std::ifstream toml_file(toml_path);
+        std::stringstream toml_buffer;
+        toml_buffer << toml_file.rdbuf();
+        std::string toml_content = toml_buffer.str();
+        uint64_t actual_hash = forma::fnv1a_hash(toml_content);
+        
+        if (actual_hash != expected_hash) {
+            error_msg = std::string("Plugin metadata hash mismatch!\n") +
+                       "  Expected: " + forma::hash_to_hex(expected_hash) + "\n" +
+                       "  Got:      " + forma::hash_to_hex(actual_hash) + "\n" +
+                       "  TOML file may be outdated or corrupted: " + toml_path.string();
             dlclose(handle);
             return false;
         }
@@ -87,6 +126,7 @@ public:
         loaded->handle = handle;
         loaded->functions.render = render_fn;
         loaded->functions.register_plugin = register_fn;
+        loaded->functions.get_metadata_hash = hash_fn;
         loaded->path = path;
         loaded->metadata = std::move(metadata);
         loaded_plugins.push_back(std::move(loaded));
@@ -98,6 +138,37 @@ public:
         }
         
         return true;
+    }
+    
+    // Load all plugins from a directory
+    // Each .so must have a matching plugin.toml in the same directory
+    int load_plugins_from_directory(const std::string& dir_path, std::vector<std::string>& errors) {
+        std::vector<std::string> plugin_files;
+        
+        // Find all .so files in directory
+        try {
+            for (const auto& entry : std::filesystem::directory_iterator(dir_path)) {
+                if (entry.is_regular_file() && entry.path().extension() == ".so") {
+                    plugin_files.push_back(entry.path().string());
+                }
+            }
+        } catch (const std::filesystem::filesystem_error& e) {
+            errors.push_back(std::string("Failed to read directory: ") + e.what());
+            return 0;
+        }
+        
+        // Load each plugin
+        int loaded_count = 0;
+        for (const auto& plugin_path : plugin_files) {
+            std::string error_msg;
+            if (load_plugin(plugin_path, error_msg)) {
+                loaded_count++;
+            } else {
+                errors.push_back(plugin_path + ": " + error_msg);
+            }
+        }
+        
+        return loaded_count;
     }
     
     // Register a built-in (statically-linked) plugin with metadata

@@ -2,13 +2,48 @@
 // Makes the LVGL renderer available as a dynamic plugin
 
 #include "lvgl_renderer.hpp"
+#include "../../../src/plugin_hash.hpp"
 #include <cstdint>
 #include <iostream>
 #include <fstream>
 #include <cstring>
 
-// Plugin exports - all metadata is in plugin.toml
+// Plugin metadata hash - computed from plugin.toml at compile time
+constexpr std::string_view PLUGIN_TOML_CONTENT = R"(# LVGL Renderer Plugin Configuration
+
+[plugin]
+name = "lvgl"
+kind = "renderer"
+api_version = "1.0.0"
+runtime = "native"
+
+[capabilities]
+provides = [
+    "renderer:lvgl",
+    "renderer:c",
+    "widgets:basic",
+    "widgets:lvgl",
+    "animation",
+    "events",
+    "layouts"
+]
+
+requires = []
+
+[renderer]
+output_extension = ".c"
+output_language = "c"
+)";
+
+constexpr uint64_t METADATA_HASH = forma::fnv1a_hash(PLUGIN_TOML_CONTENT);
+
+// Plugin exports
 extern "C" {
+
+// Plugin metadata hash (required)
+uint64_t forma_plugin_metadata_hash() {
+    return METADATA_HASH;
+}
 
 // Render function (required)
 bool forma_render(const void* doc_ptr, const char* input_path, const char* output_path) {

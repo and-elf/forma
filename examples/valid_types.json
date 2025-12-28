@@ -1,0 +1,26 @@
+{
+  "types": [
+    {
+      "name": "Button",
+      "base": "",
+      "property_count": 5,
+      "method_count": 0
+    }
+  ],
+  "instances": [
+    {
+      "type": "Button",
+      "property_count": 5,
+      "child_count": 0
+    },
+    {
+      "type": "Button",
+      "property_count": 3,
+      "child_count": 0
+    }
+  ],
+  "type_count": 1,
+  "instance_count": 2,
+  "enum_count": 0,
+  "import_count": 0
+}
