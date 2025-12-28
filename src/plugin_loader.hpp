@@ -18,6 +18,9 @@ struct PluginCapabilities {
     
     // Renderer callback: render(doc, input_path, output_path) -> success
     bool (*render)(const void* doc, const char* input_path, const char* output_path);
+    
+    // Output file extension for renderer (e.g., ".c", ".cpp", ".js")
+    const char* output_extension;
 };
 
 struct FormaPluginDescriptor {
@@ -108,6 +111,24 @@ public:
         }
         
         return true;
+    }
+    
+    // Register a built-in (statically-linked) plugin
+    void register_builtin_plugin(FormaPluginDescriptor* descriptor, const std::string& name) {
+        if (!descriptor) {
+            return;
+        }
+        
+        // Validate API version
+        if (descriptor->api_version != 1) {
+            std::cerr << "Warning: Built-in plugin " << name 
+                      << " has incompatible API version: " << descriptor->api_version << std::endl;
+            return;
+        }
+        
+        // Create a LoadedPlugin entry without a dynamic library handle
+        auto* loaded = new LoadedPlugin{nullptr, descriptor, "builtin:" + name};
+        loaded_plugins.push_back(loaded);
     }
     
     // Get all loaded plugins

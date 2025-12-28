@@ -17,6 +17,9 @@ struct PluginCapabilities {
     
     // Renderer callback: render(doc, input_path, output_path) -> success
     bool (*render)(const void* doc, const char* input_path, const char* output_path);
+    
+    // Output file extension for renderer (e.g., ".c", ".cpp", ".js")
+    const char* output_extension;
 };
 
 struct FormaPluginDescriptor {
@@ -40,7 +43,8 @@ static FormaPluginDescriptor lvgl_plugin = {
         .supports_theme = false,
         .supports_audio = false,
         .supports_build = false,
-        .render = lvgl_render
+        .render = lvgl_render,
+        .output_extension = ".c"
     },
     .register_plugin = nullptr
 };
