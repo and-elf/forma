@@ -1,0 +1,22 @@
+# Tracer/Logger Plugin
+
+[plugin]
+name = "tracer"
+kind = "tooling"
+api_version = "1.0.0"
+runtime = "native"
+
+[capabilities]
+provides = [
+    "logging",
+    "tracing",
+    "diagnostics:output",
+    "compiler-output"
+]
+
+dependencies = []
+
+[tooling]
+# Tracer specific settings
+supports_levels = true
+formats = ["console", "structured"]

@@ -1,0 +1,21 @@
+# JSON Renderer Plugin
+
+[plugin]
+name = "json-renderer"
+kind = "renderer"
+api_version = "1.0.0"
+runtime = "native"
+
+[capabilities]
+provides = [
+    "renderer:json",
+    "export:json",
+    "serialization",
+    "debugging"
+]
+
+dependencies = []
+
+[renderer]
+output_extension = ".json"
+output_language = "json"

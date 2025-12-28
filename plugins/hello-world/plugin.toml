@@ -1,0 +1,15 @@
+# Hello World Example Plugin
+
+[plugin]
+name = "hello-world"
+kind = "example"
+api_version = "1.0.0"
+runtime = "native"
+
+[capabilities]
+provides = [
+    "example",
+    "demo"
+]
+
+dependencies = []

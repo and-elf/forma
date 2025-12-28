@@ -1,0 +1,22 @@
+# CMake Build System Generator Plugin
+
+[plugin]
+name = "cmake-generator"
+kind = "build"
+api_version = "1.0.0"
+runtime = "native"
+
+[capabilities]
+provides = [
+    "build:cmake",
+    "build-system",
+    "cross-compilation",
+    "toolchain-management"
+]
+
+dependencies = []
+
+[build]
+# Build system specific settings
+supports_cross_compilation = true
+toolchain_auto_download = true

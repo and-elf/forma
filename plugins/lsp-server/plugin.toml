@@ -1,0 +1,24 @@
+# LSP (Language Server Protocol) Plugin
+
+[plugin]
+name = "forma-lsp"
+kind = "lsp"
+api_version = "1.0.0"
+runtime = "native"
+
+[capabilities]
+provides = [
+    "lsp:hover",
+    "lsp:completion",
+    "lsp:goto-definition",
+    "lsp:diagnostics",
+    "lsp:document-symbols",
+    "language-server"
+]
+
+dependencies = []
+
+[lsp]
+# LSP specific settings
+transport = "stdio"  # or "http"
+supports_workspace = true
