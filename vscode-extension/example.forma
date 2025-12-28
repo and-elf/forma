@@ -1,0 +1,71 @@
+// Simple Forma example for testing the VSCode extension
+
+// Define a color enum
+enum Color {
+    Red,
+    Green,
+    Blue,
+    Yellow
+}
+
+// Define an alignment enum
+enum Alignment {
+    Left,
+    Center,
+    Right
+}
+
+// A simple button instance
+myButton: Button {
+    text: "Click Me"
+    width: 120
+    height: 40
+    color: Blue
+}
+
+// A panel with nested widgets
+mainPanel: Panel {
+    width: 480
+    height: 320
+    
+    // Title label
+    titleLabel: Label {
+        text: "Dashboard"
+        x: 10
+        y: 10
+        alignment: Center
+    }
+    
+    // Interactive slider
+    volumeSlider: Slider {
+        value: 50
+        min: 0
+        max: 100
+        x: 10
+        y: 50
+        width: 200
+    }
+    
+    // Status indicator
+    statusLight: Circle {
+        radius: 10
+        x: 450
+        y: 20
+        color: Green
+    }
+}
+
+// Checkbox with event handling
+autoUpdate: Checkbox {
+    checked: true
+    text: "Auto Update"
+    
+    when checked {
+        true => {
+            statusLight.color: Green
+        }
+        false => {
+            statusLight.color: Red
+        }
+    }
+}

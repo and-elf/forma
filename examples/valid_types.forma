@@ -1,0 +1,24 @@
+// Test valid property types
+
+class Button {
+    property text: string
+    property x: int
+    property y: int
+    property width: int
+    property enabled: bool
+}
+
+// All valid - should pass type checking
+Button {
+    text: "Click Me"
+    x: 10
+    y: 20
+    width: 100
+    enabled: true
+}
+
+Button {
+    text: "Another Button"
+    x: 50
+    enabled: false
+}

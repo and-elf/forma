@@ -1,0 +1,17 @@
+// Example demonstrating generic array types
+
+DataModel {
+    // Array of integers with max size 10
+    property numbers: Forma.Array(int, 10)
+    
+    // Array of strings with max size 100
+    property names: Forma.Array(string, 100)
+    
+    // Array of custom types with max size 50
+    property items: Forma.Array(Item, 50)
+}
+
+Item {
+    property id: int
+    property label: string
+}

@@ -1,0 +1,28 @@
+// Test asset bundling with forma:// URIs
+
+Image {
+    x: 10
+    y: 10
+    width: 200
+    height: 150
+    src: "forma://assets/logo.png"
+}
+
+Image {
+    x: 10
+    y: 170
+    width: 100
+    height: 100
+    src: "forma://assets/icons/settings.png"
+}
+
+Button {
+    x: 120
+    y: 170
+    width: 150
+    height: 50
+    
+    Label {
+        text: "Click Me"
+    }
+}

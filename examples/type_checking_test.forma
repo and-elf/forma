@@ -1,0 +1,31 @@
+// Test property type checking
+
+class Button {
+    property text: string
+    property x: int
+    property y: int
+    property width: int
+    property enabled: bool
+}
+
+// Valid instance - all types match
+Button {
+    text: "Click Me"
+    x: 10
+    y: 20
+    width: 100
+    enabled: true
+}
+
+// Invalid instance - type mismatches
+Button {
+    text: 123          // Error: expected string, got int
+    x: "wrong"         // Error: expected int, got string
+    enabled: 42        // Error: expected bool, got int
+}
+
+// Invalid instance - unknown property
+Button {
+    text: "OK"
+    invalid_prop: 100  // Error: property doesn't exist
+}

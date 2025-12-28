@@ -1,0 +1,89 @@
+// Forma Programming Language - Main Compiler Entry Point
+
+#include "src/parser/ir.hpp"
+#include "src/parser/semantic.hpp"
+#include "src/core/assets.hpp"
+#include "src/plugin_loader.hpp"
+#include "plugins/tracer/src/tracer_plugin.hpp"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <filesystem>
+
+// Built-in LVGL renderer (fallback if plugin not loaded)
+#include "plugins/lvgl-renderer/src/lvgl_renderer.hpp"
+
+struct CompilerOptions {
+    std::string mode = "compile";
+    std::string renderer;
+    std::vector<std::string> plugins;
+    std::string project_path;
+    std::string build_system;
+    std::string input_file;
+    bool verbose = false;
+    bool debug = false;
+    bool list_plugins = false;
+};
+
+void print_usage(const char* program_name) {
+    std::cout << "Forma Programming Language v0.1.0\n\n";
+    std::cout << "Usage: " << program_name << " [options] <input-file>\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  --mode <mode>        Execution mode: compile, lsp, repl\n";
+    std::cout << "  --renderer <name>    Renderer backend: js, sdl, lvgl, vulkan\n";
+    std::cout << "  --plugin <path>      Load plugin from shared library (.so)\n";
+    std::cout << "  --list-plugins       List all loaded plugins\n";
+    std::cout << "  --project <path>     Project directory\n";
+    std::cout << "  --build <system>     Build system: cmake, meson, bazel\n";
+    std::cout << "  -v, --verbose        Enable verbose output\n";
+    std::cout << "  --debug              Enable debug output\n";
+    std::cout << "  --help               Show this help message\n";
+    std::cout << "  --version            Show version information\n";
+}
+
+void print_version() {
+    std::cout << "Forma v0.1.0\n";
+    std::cout << "A QML-inspired programming language\n";
+}
+
+CompilerOptions parse_arguments(int argc, char* argv[]) {
+    CompilerOptions opts;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            print_usage(argv[0]);
+            std::exit(0);
+        } else if (arg == "--version") {
+            print_version();
+            std::exit(0);
+        } else if (arg == "--list-plugins") {
+            opts.list_plugins = true;
+        } else if (arg == "-v" || arg == "--verbose") {
+            opts.verbose = true;
+        } else if (arg == "--debug") {
+            opts.debug = true;
+            opts.verbose = true;
+        } else if (arg == "--mode" && i + 1 < argc) {
+            opts.mode = argv[++i];
+        } else if (arg == "--renderer" && i + 1 < argc) {
+            opts.renderer = argv[++i];
+        } else if (arg == "--plugin" && i + 1 < argc) {
+            opts.plugins.push_back(argv[++i]);
+        } else if (arg == "--project" && i + 1 < argc) {
+            opts.project_path = argv[++i];
+        } else if (arg == "--build" && i + 1 < argc) {
+            opts.build_system = argv[++i];
+        } else if (arg[0] != '-') {
+            opts.input_file = arg;
+        }
+    }
+    
+    return opts;
+}
+
+int load_plugins(forma::PluginLoader& plugin_loader, const std::vector<std::string>& plugin_paths,

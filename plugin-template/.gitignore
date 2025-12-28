@@ -1,0 +1,14 @@
+.git/
+build/
+*.o
+*.so
+*.dylib
+*.dll
+*.a
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.user
+.vscode/
+.idea/

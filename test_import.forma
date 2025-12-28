@@ -1,0 +1,19 @@
+import forma.animation
+import forma.color
+
+enum Status {
+    Active,
+    Inactive
+}
+
+class Button {
+    property string text
+    property int x: 0
+    property int y: 0
+}
+
+Button {
+    text: "Click Me"
+    x: 10
+    y: 20
+}

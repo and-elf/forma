@@ -1,0 +1,50 @@
+// Example demonstrating class usage in Forma
+
+class Foo {
+    property int bar
+    
+    method int getBar() {
+        return bar
+    }
+    
+    method void setBar(int value) {
+        bar: value
+    }
+}
+
+class Counter {
+    property int count
+    
+    method void increment() {
+        count: count + 1
+    }
+    
+    method void reset() {
+        count: 0
+    }
+}
+
+// Using a class instance as a property
+Rectangle {
+    property Foo foo
+    
+    x: foo.getBar()
+    width: 200
+    height: 100
+}
+
+// Another example with nested class usage
+Panel {
+    property Counter counter
+    property Foo data
+    
+    Button {
+        text: "Increment"
+        onClick: counter.increment()
+    }
+    
+    Label {
+        text: counter.count
+        x: data.getBar()
+    }
+}

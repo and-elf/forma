@@ -1,0 +1,62 @@
+// Example Forma file showing type resolution and diagnostics
+
+// Imports (would bring types into scope)
+// import "std.ui"  // Would provide Button, Text, Rectangle, etc.
+// import "./CustomWidget.fml"
+
+// Define custom types
+Rectangle {
+    property width: int
+    property height: int
+    property color: string
+}
+
+// Type inheritance - MyRect inherits from Rectangle
+MyRect: Rectangle {
+    property cornerRadius: int
+    property shadow: bool
+}
+
+// Enum for colors
+enum Color {
+    Red,
+    Green,
+    Blue,
+    Transparent
+}
+
+// Event declarations
+event onClicked()
+event onValueChanged(value: int)
+event onDataUpdated(items: Array)  // Array would need to be imported or defined
+
+// Valid instance using defined types
+Window {
+    id: mainWindow
+    width: 800
+    height: 600
+    
+    MyRect {
+        id: customRect
+        width: 200
+        height: 100
+        cornerRadius: 10
+        shadow: true
+        color: Color.Red  // Using enum value
+    }
+    
+    // This would cause an error - UnknownType not defined
+    // UnknownWidget {
+    //     property: value
+    // }
+}
+
+// Type with property using undefined type - would generate diagnostic
+// BadWidget {
+//     property data: UndefinedType  // ERROR: unknown-type
+// }
+
+// Valid inheritance
+CustomButton: Button {  // ERROR if Button not imported or defined
+    property customProperty: string
+}

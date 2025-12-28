@@ -1,0 +1,76 @@
+# Forma Project Configuration
+# This file defines the project structure and build settings
+
+[package]
+name = "forma"
+version = "0.1.0"
+description = "A QML-inspired programming language with compile-time evaluation"
+authors = "Forma Contributors"
+license = "MIT"
+
+[imports]
+# Import search paths for .fml modules
+# Paths are searched in order; first match wins
+paths = ["./lib", "./lib/forma"]
+
+[build]
+# C++ standard version
+standard = "c++20"
+
+# Compiler settings
+warnings = true
+warnings-as-errors = false
+optimize = true
+
+# Output settings
+binary-name = "forma"
+library-name = "libforma"
+
+[lsp]
+# Language Server Protocol settings
+enabled = true
+port = 8080
+
+# LSP capabilities
+diagnostics = true
+completion = false
+hover = false
+goto-definition = false
+
+# Resource limits
+max-documents = 16
+max-diagnostics-per-document = 32
+
+[plugins]
+# Plugin system settings
+enabled = true
+directory = "./plugins"
+auto-load = true
+
+# Known plugins
+builtin = ["cmake-generator", "vscode-extension"]
+
+[testing]
+# Testing configuration
+enabled = true
+framework = "constexpr"
+run-at-compile-time = true
+
+[dependencies]
+# No external dependencies currently
+# Forma is a standalone C++20 header-only library
+
+[dev-dependencies]
+# Development tools
+cmake-min-version = "3.20"
+
+[features]
+# Language features
+constexpr-evaluation = true
+generic-types = true
+type-inference = false
+modules = false
+
+# Syntax features
+qml-compatibility = true
+reactive-properties = false

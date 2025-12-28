@@ -1,0 +1,75 @@
+// Example showcasing new Forma language features
+
+// Type inheritance
+MyRect: Rectangle {
+    property cornerRadius: int
+    property shadow: bool
+}
+
+// Enum declaration
+enum Color {
+    Red,
+    Green,
+    Blue,
+    Yellow
+}
+
+enum Alignment {
+    Left,
+    Center,
+    Right,
+    Top,
+    Middle,
+    Bottom
+}
+
+// Event declarations
+event onClicked()
+event onValueChanged(value: int)
+event onMouseMove(x: int, y: int, button: string)
+
+// Instance with id property
+Window {
+    id: mainWindow
+    width: 800
+    height: 600
+    
+    MyRect {
+        id: customRect
+        width: 200
+        height: 100
+        cornerRadius: 10
+        shadow: true
+        color: Red
+    }
+}
+
+// When statements for reactive programming
+Button {
+    id: toggleButton
+    text: "Click me"
+    
+    when (clicked) {
+        enabled: false
+    }
+    
+    when (width > 100) {
+        visible: true
+    }
+}
+
+// Inline preview for IDE tooling (not compiled into binary)
+// Preview is attached to property values with 'or preview{...}'
+ListView {
+    id: itemList
+    model: items or preview{sampleData}
+    delegate: Text {
+        content: modelData or preview{"Sample Item"}
+    }
+}
+
+Bar: ListView {
+    property Foo foo
+    // The real value is foo.items(), but IDE can use preview data
+    model: items or preview{100}
+}

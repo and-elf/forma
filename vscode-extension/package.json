@@ -1,0 +1,96 @@
+{
+  "name": "forma-language",
+  "displayName": "Forma Language Support",
+  "description": "Language support for Forma - a QML-inspired declarative programming language",
+  "version": "0.1.0",
+  "publisher": "forma",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "forma",
+    "declarative",
+    "UI",
+    "QML"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:forma"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "forma",
+        "aliases": [
+          "Forma",
+          "forma"
+        ],
+        "extensions": [
+          ".forma",
+          ".fml"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/forma-icon.png",
+          "dark": "./icons/forma-icon.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "forma",
+        "scopeName": "source.forma",
+        "path": "./syntaxes/forma.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Forma",
+      "properties": {
+        "forma.languageServer.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the forma_lsp_server_stdio executable. If empty, will search in workspace build directories."
+        },
+        "forma.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.x",
+    "@types/vscode": "^1.75.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.40.0",
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^2.19.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/forma"
+  },
+  "license": "MIT"
+}

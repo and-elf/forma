@@ -1,0 +1,36 @@
+// Test hierarchical widget nesting
+Container {
+    width: 480
+    height: 320
+    
+    Button {
+        x: 10
+        y: 10
+        width: 120
+        height: 40
+        
+        Label {
+            text: "Click Me"
+        }
+    }
+    
+    Panel {
+        x: 150
+        y: 10
+        width: 200
+        height: 150
+        
+        Label {
+            x: 10
+            y: 10
+            text: "Panel Header"
+        }
+        
+        Button {
+            x: 10
+            y: 50
+            width: 100
+            height: 30
+        }
+    }
+}

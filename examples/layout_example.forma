@@ -1,0 +1,165 @@
+// Layout Examples
+// Demonstrates Row, Column, Table, and other layout containers
+
+import forma.widgets
+import forma.layout
+
+// Example 1: Row layout with buttons
+Row {
+    x: 10
+    y: 10
+    spacing: 10
+    align: "start"
+    
+    Button {
+        text: "First"
+        width: 80
+    }
+    
+    Button {
+        text: "Second"
+        width: 80
+    }
+    
+    Button {
+        text: "Third"
+        width: 80
+    }
+}
+
+// Example 2: Column layout with labels
+Column {
+    x: 10
+    y: 80
+    spacing: 5
+    align: "start"
+    
+    Label {
+        text: "Name:"
+    }
+    
+    TextArea {
+        placeholder: "Enter name"
+        width: 200
+        height: 30
+    }
+    
+    Label {
+        text: "Email:"
+    }
+    
+    TextArea {
+        placeholder: "Enter email"
+        width: 200
+        height: 30
+    }
+}
+
+// Example 3: Table layout
+Table {
+    x: 10
+    y: 200
+    width: 400
+    height: 300
+    rows: 3
+    cols: 3
+    row_spacing: 2
+    col_spacing: 2
+    show_borders: true
+    show_headers: true
+}
+
+// Example 4: Grid layout
+Grid {
+    x: 10
+    y: 520
+    width: 300
+    height: 200
+    columns: 3
+    col_spacing: 10
+    row_spacing: 10
+    
+    Button {
+        text: "1"
+    }
+    
+    Button {
+        text: "2"
+    }
+    
+    Button {
+        text: "3"
+    }
+    
+    Button {
+        text: "4"
+    }
+    
+    Button {
+        text: "5"
+    }
+    
+    Button {
+        text: "6"
+    }
+}
+
+// Example 5: Flex layout
+Flex {
+    x: 320
+    y: 10
+    width: 300
+    height: 100
+    direction: "row"
+    justify: "space-between"
+    align_items: "center"
+    gap: 10
+    
+    Button {
+        text: "Flex 1"
+    }
+    
+    Button {
+        text: "Flex 2"
+    }
+    
+    Button {
+        text: "Flex 3"
+    }
+}
+
+// Example 6: Nested layouts
+Column {
+    x: 320
+    y: 120
+    spacing: 10
+    
+    Label {
+        text: "User Profile"
+    }
+    
+    Row {
+        spacing: 10
+        
+        Label {
+            text: "Status:"
+        }
+        
+        Switch {
+            checked: true
+        }
+    }
+    
+    Row {
+        spacing: 10
+        
+        Label {
+            text: "Volume:"
+        }
+        
+        Slider {
+            value: 50
+            width: 150
+        }
+    }
+}

@@ -1,0 +1,17 @@
+// Test file for animation parsing
+
+Button {
+    text: "Test"
+    x: 10
+    y: 20
+    
+    animate {
+        property: "x"
+        from: 0
+        to: 100
+        duration: 500
+        easing: "ease_in"
+        delay: 0
+        repeat: false
+    }
+}

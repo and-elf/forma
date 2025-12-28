@@ -1,0 +1,3 @@
+[submodule "external/bugspray"]
+	path = external/bugspray
+	url = https://github.com/jan-moeller/bugspray
