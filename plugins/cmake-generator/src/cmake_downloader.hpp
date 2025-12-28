@@ -64,32 +64,17 @@ public:
             }
         };
         
-        auto result = download::download_file(url, filename, opts);
+        std::cout << "\nDownloading and extracting CMake...\n";
         
-        if (!result.success) {
-            std::cerr << "\nDownload failed: " << result.error_message << "\n";
+        // Use download_and_extract - it handles download, extraction, and cleanup
+        bool success = download::download_and_extract(url, install_dir, 1, opts); //  Strip 1 component
+        
+        if (!success) {
+            std::cerr << "\nFailed to download and extract CMake\n";
             return false;
         }
         
-        std::cout << "\nDownload complete (" << result.bytes_downloaded / 1024 / 1024 << " MB)\n";
-        std::cout << "Extracting...\n";
-        
-        // Extract using system tar/unzip (TODO: use libarchive when available)
-#if defined(_WIN32)
-        std::string cmd = "cd \"" + install_dir + "\" && unzip -q cmake-download.zip";
-#else
-        std::string cmd = "cd \"" + install_dir + "\" && tar xzf cmake-download.tar.gz --strip-components=1";
-#endif
-        
-        if (system(cmd.c_str()) != 0) {
-            std::cerr << "Extraction failed\n";
-            return false;
-        }
-        
-        // Clean up archive
-        std::filesystem::remove(filename);
-        
-        std::cout << "CMake installed to " << install_dir << "\n";
+        std::cout << "\nCMake installed to " << install_dir << "\n";
         return true;
 #else
         (void)install_dir; // Unused when download support is disabled
