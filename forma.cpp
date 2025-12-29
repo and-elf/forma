@@ -27,11 +27,13 @@ struct CompilerOptions {
     std::string target_triple;
     std::string target;  // Target platform: esp32, linux, windows, etc.
     std::string project_name;
+    std::string plugin_type;  // Plugin type for init plugin
     std::string input_file;
     std::string release_system;
     bool verbose = false;
     bool debug = false;
     bool list_plugins = false;
+    bool is_plugin = false;  // true for forma init plugin
 };
 
 void print_usage(const char* program_name) {
@@ -39,6 +41,7 @@ void print_usage(const char* program_name) {
     std::cout << "Usage: " << program_name << " [command] [options] <input-file>\n\n";
     std::cout << "Commands:\n";
     std::cout << "  init                 Initialize a new Forma project\n";
+    std::cout << "  init plugin          Initialize a new Forma plugin\n";
     std::cout << "  build                Build project for target platform\n";
     std::cout << "  release              Build and package project for release\n\n";
     std::cout << "Options:\n";
@@ -50,7 +53,8 @@ void print_usage(const char* program_name) {
     std::cout << "  --project <path>     Project directory\n";
     std::cout << "  --build <system>     Build system: cmake, meson, bazel\n";
     std::cout << "  --target <platform>  Target platform: esp32, esp32s3, linux, windows\n";
-    std::cout << "  --name <name>        Project name (for init command)\n";
+    std::cout << "  --name <name>        Project/plugin name (for init command)\n";
+    std::cout << "  --type <type>        Plugin type: renderer, lsp, build (for init plugin)\n";
     std::cout << "  --release-system <system>  Release packaging system: deb, rpm, etc.\n";
     std::cout << "  -v, --verbose        Enable verbose output\n";
     std::cout << "  --debug              Enable debug output\n";
@@ -77,6 +81,10 @@ CompilerOptions parse_arguments(int argc, char* argv[]) {
             std::exit(0);
         } else if (arg == "init") {
             opts.mode = "init";
+            if (i + 1 < argc && std::string(argv[i + 1]) == "plugin") {
+                opts.is_plugin = true;
+                ++i;
+            }
         } else if (arg == "build") {
             opts.mode = "build";
         } else if (arg == "release") {
@@ -104,6 +112,8 @@ CompilerOptions parse_arguments(int argc, char* argv[]) {
             opts.target = argv[++i];
         } else if (arg == "--name" && i + 1 < argc) {
             opts.project_name = argv[++i];
+        } else if (arg == "--type" && i + 1 < argc) {
+            opts.plugin_type = argv[++i];
         } else if (arg == "--release-system" && i + 1 < argc) {
             opts.release_system = argv[++i];
         } else if (arg[0] != '-') {
@@ -434,13 +444,20 @@ int main(int argc, char* argv[]) {
     // Handle init command early (before loading plugins or files)
     if (opts.mode == "init") {
         forma::commands::InitOptions init_opts;
-        init_opts.project_name = opts.project_name.empty() ? "myapp" : opts.project_name;
+        init_opts.project_name = opts.project_name.empty() ? (opts.is_plugin ? "myplugin" : "myapp") : opts.project_name;
+        init_opts.is_plugin = opts.is_plugin;
+        init_opts.plugin_type = opts.plugin_type.empty() ? "renderer" : opts.plugin_type;
+        init_opts.project_dir = opts.project_path.empty() ? (opts.is_plugin ? init_opts.project_name : ".") : opts.project_path;
+        init_opts.verbose = opts.verbose;
+        
+        if (opts.is_plugin) {
+            return forma::commands::run_plugin_init(init_opts);
+        }
+        
         init_opts.build_system = opts.build_system.empty() ? "cmake" : opts.build_system;
         init_opts.target_triple = opts.target_triple;
         init_opts.target = opts.target;
         init_opts.renderer = opts.renderer.empty() ? "lvgl" : opts.renderer;
-        init_opts.project_dir = opts.project_path.empty() ? "." : opts.project_path;
-        init_opts.verbose = opts.verbose;
         
         return forma::commands::run_init_command(init_opts);
     }
