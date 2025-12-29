@@ -239,6 +239,7 @@ if(FORMA_BUILD_PLUGINS)
     add_subdirectory(plugins/lsp-server)
     add_subdirectory(plugins/cmake-generator)
     add_subdirectory(plugins/deb-release)
+    add_subdirectory(plugins/esp32-lvgl)
 endif()
 
 # ============================================================================
