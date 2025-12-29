@@ -1,5 +1,4 @@
 #include "../src/lvgl_renderer.hpp"
-#include "lvgl_tests.hpp"
 #include <iostream>
 
 using namespace forma;
@@ -123,9 +122,6 @@ void demo_ui_generation() {
 }
 
 int main() {
-    // Run unit tests first
-    forma::lvgl::tests::run_all_tests();
-    
     // Run the demo
     demo_ui_generation();
     

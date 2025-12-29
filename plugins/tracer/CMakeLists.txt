@@ -43,3 +43,20 @@ write_basic_package_version_file(
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/FormaTracerConfigVersion.cmake"
     DESTINATION lib/cmake/FormaTracer
 )
+
+# Tests
+option(TRACER_BUILD_TESTS "Build tracer plugin tests" ON)
+if(TRACER_BUILD_TESTS)
+    # Use bugspray from parent project
+    if(NOT TARGET bugspray-with-main)
+        message(WARNING "bugspray-with-main target not found. Skipping tracer tests.")
+    else()
+        add_executable(tracer_tests
+            tests/test_tracer.cpp
+        )
+        target_link_libraries(tracer_tests PRIVATE FormaTracer bugspray-with-main)
+        
+        enable_testing()
+        add_test(NAME tracer_tests COMMAND tracer_tests)
+    endif()
+endif()

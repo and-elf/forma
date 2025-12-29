@@ -37,4 +37,33 @@ TEST_CASE("VirtualFS - Basic File Operations")
         CHECK(!fs.exists("file:///test.fml"));
         CHECK(fs.count() == static_cast<size_t>(0));
     }
+    
+    SECTION("Multiple files")
+    {
+        fs.write_file("file:///point.fml", "Point {}");
+        fs.write_file("file:///rect.fml", "Rectangle {}");
+        fs.write_file("file:///circle.fml", "Circle {}");
+        
+        CHECK(fs.count() == static_cast<size_t>(3));
+        CHECK(fs.exists("file:///point.fml"));
+        CHECK(fs.exists("file:///rect.fml"));
+        CHECK(fs.exists("file:///circle.fml"));
+    }
+    
+    SECTION("File not found")
+    {
+        auto content = fs.read_file("file:///nonexistent.fml");
+        CHECK(!content.has_value());
+        CHECK(!fs.exists("file:///nonexistent.fml"));
+    }
+    
+    SECTION("File versioning")
+    {
+        fs.write_file("file:///test.fml", "v1", 1);
+        fs.write_file("file:///test.fml", "v2", 2);
+        fs.write_file("file:///test.fml", "v3", 3);
+        
+        auto content = fs.read_file("file:///test.fml");
+        CHECK(content.value() == "v3");
+    }
 }

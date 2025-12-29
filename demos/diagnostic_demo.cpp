@@ -138,7 +138,9 @@ int main() {
         
         SemanticAnalyzer<64> analyzer(&symbols);
         SourceLocation loc{1, 0, 0, 0};
-        analyzer.validate_instance(inst, loc);
+        
+        std::array<TypeDecl, 0> empty_types{};
+        analyzer.validate_instance(inst, empty_types, 0, loc);
         
         print_diagnostics(analyzer.diagnostics, "Diagnostics");
     }

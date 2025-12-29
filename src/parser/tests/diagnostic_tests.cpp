@@ -97,7 +97,9 @@ TEST_CASE("Diagnostics - Instance Validation")
         
         SemanticAnalyzer<64> analyzer(&symbols);
         SourceLocation loc{0, 0, 0, 0};
-        analyzer.validate_instance(inst, loc);
+        
+        std::array<TypeDecl, 0> empty_types{};
+        analyzer.validate_instance(inst, empty_types, 0, loc);
         
         CHECK(analyzer.diagnostics.count == 1ul);
         CHECK(analyzer.diagnostics.diagnostics[0].severity == DiagnosticSeverity::Error);
@@ -114,7 +116,9 @@ TEST_CASE("Diagnostics - Instance Validation")
         
         SemanticAnalyzer<64> analyzer(&symbols);
         SourceLocation loc{0, 0, 0, 0};
-        analyzer.validate_instance(inst, loc);
+        
+        std::array<TypeDecl, 0> empty_types{};
+        analyzer.validate_instance(inst, empty_types, 0, loc);
         
         CHECK(analyzer.diagnostics.count == 0ul);
     }

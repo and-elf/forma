@@ -1,4 +1,4 @@
-#include "lvgl_tests.hpp"
+#include "../src/lvgl_renderer.hpp"
 #include <iostream>
 
 using namespace forma;

@@ -32,13 +32,18 @@ target_include_directories(forma_example_plugin PUBLIC
 # Tests
 option(BUILD_TESTS "Build plugin tests" ON)
 if(BUILD_TESTS)
-    add_executable(example_plugin_tests
-        tests/example_plugin_tests.cpp
-    )
-    target_link_libraries(example_plugin_tests PRIVATE forma_example_plugin)
-    
-    enable_testing()
-    add_test(NAME example_plugin_tests COMMAND example_plugin_tests)
+    # Use bugspray from parent project
+    if(NOT TARGET bugspray-with-main)
+        message(WARNING "bugspray-with-main target not found. Skipping example plugin tests.")
+    else()
+        add_executable(example_plugin_tests
+            tests/example_plugin_tests.cpp
+        )
+        target_link_libraries(example_plugin_tests PRIVATE forma_example_plugin bugspray-with-main)
+        
+        enable_testing()
+        add_test(NAME example_plugin_tests COMMAND example_plugin_tests)
+    endif()
 endif()
 
 # Examples

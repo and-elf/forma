@@ -23,7 +23,7 @@ TEST_CASE("Parser - Type Declaration")
         TypeDecl decl = parse_type_from_source(source);
         
         CHECK(decl.name == "Rectangle");
-        CHECK(decl.prop_count == 1zu);
+        CHECK(decl.prop_count == 1ul);
         CHECK(decl.properties[0].name == "width");
         CHECK(decl.properties[0].type.name == "int");
     }
@@ -39,7 +39,7 @@ TEST_CASE("Parser - Type Declaration")
         TypeDecl decl = parse_type_from_source(source);
         
         CHECK(decl.name == "Rectangle");
-        CHECK(decl.prop_count == 3zu);
+        CHECK(decl.prop_count == 3ul);
         CHECK(decl.properties[0].name == "width");
         CHECK(decl.properties[1].name == "height");
         CHECK(decl.properties[2].name == "color");
@@ -57,7 +57,7 @@ TEST_CASE("Parser - Instance Declaration")
         InstanceDecl inst = parse_instance_from_source(source);
         
         CHECK(inst.type_name == "Rectangle");
-        CHECK(inst.prop_count == 1zu);
+        CHECK(inst.prop_count == 1ul);
         CHECK(inst.properties[0].name == "width");
         CHECK(inst.properties[0].value.kind == Value::Kind::Integer);
         CHECK(inst.properties[0].value.text == "100");
@@ -72,7 +72,7 @@ TEST_CASE("Parser - Instance Declaration")
         InstanceDecl inst = parse_instance_from_source(source);
         
         CHECK(inst.type_name == "Text");
-        CHECK(inst.prop_count == 1zu);
+        CHECK(inst.prop_count == 1ul);
         CHECK(inst.properties[0].name == "content");
         CHECK(inst.properties[0].value.kind == Value::Kind::String);
         CHECK(inst.properties[0].value.text == "Hello, World");
@@ -87,7 +87,7 @@ TEST_CASE("Parser - Instance Declaration")
         InstanceDecl inst = parse_instance_from_source(source);
         
         CHECK(inst.type_name == "Widget");
-        CHECK(inst.prop_count == 1zu);
+        CHECK(inst.prop_count == 1ul);
         CHECK(inst.properties[0].name == "visible");
         CHECK(inst.properties[0].value.kind == Value::Kind::Bool);
         CHECK(inst.properties[0].value.text == "true");
@@ -104,7 +104,7 @@ TEST_CASE("Parser - Instance Declaration")
         InstanceDecl inst = parse_instance_from_source(source);
         
         CHECK(inst.type_name == "Rectangle");
-        CHECK(inst.prop_count == 3zu);
+        CHECK(inst.prop_count == 3ul);
         CHECK(inst.properties[0].name == "width");
         CHECK(inst.properties[1].name == "height");
         CHECK(inst.properties[2].name == "visible");
@@ -124,7 +124,7 @@ TEST_CASE("Parser - Nested Instances")
         InstanceDecl inst = parse_instance_from_source(source);
         
         CHECK(inst.type_name == "Container");
-        CHECK(inst.prop_count == 1zu);
+        CHECK(inst.prop_count == 1ul);
         CHECK(inst.properties[0].name == "child");
         // Note: Nested instances are represented differently in current IR
     }
@@ -141,7 +141,7 @@ TEST_CASE("Parser - Enum Declaration")
     EnumDecl decl = parse_enum_from_source(source);
     
     CHECK(decl.name == "Alignment");
-    CHECK(decl.value_count == 3zu);
+    CHECK(decl.value_count == 3ul);
     CHECK(decl.values[0].name == "Left");
     CHECK(decl.values[1].name == "Center");
     CHECK(decl.values[2].name == "Right");
@@ -162,9 +162,9 @@ TEST_CASE("Parser - Document Parsing")
         EventDecl event = parse_event_from_source(event_source);
         
         CHECK(type.name == "Rectangle");
-        CHECK(type.prop_count == 2zu);
+        CHECK(type.prop_count == 2ul);
         CHECK(event.name == "onSizeChanged");
-        CHECK(event.param_count == 2zu);
+        CHECK(event.param_count == 2ul);
     }
     
     SECTION("Import statements")
@@ -189,13 +189,13 @@ Button {
         
         constexpr auto doc = parse_document(source);
         
-        CHECK(doc.import_count == 2zu);
+        CHECK(doc.import_count == 2ul);
         CHECK(doc.imports[0].module_path == "forma.animation");
         CHECK(doc.imports[1].module_path == "forma.color");
-        CHECK(doc.enum_count == 1zu);
+        CHECK(doc.enum_count == 1ul);
         CHECK(doc.enums[0].name == "Status");
-        CHECK(doc.type_count == 1zu);
+        CHECK(doc.type_count == 1ul);
         CHECK(doc.types[0].name == "Button");
-        CHECK(doc.instances.count == 1zu);
+        CHECK(doc.instances.count == 1ul);
     }
 }

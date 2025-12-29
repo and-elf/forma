@@ -38,18 +38,23 @@ target_include_directories(forma_lvgl_renderer PUBLIC
 # Tests (plugin-specific option, independent of core FORMA_BUILD_TESTS)
 option(LVGL_RENDERER_BUILD_TESTS "Build LVGL renderer plugin tests" ON)
 if(LVGL_RENDERER_BUILD_TESTS)
-    add_executable(lvgl_renderer_tests
-        tests/lvgl_tests.cpp
-    )
-    target_link_libraries(lvgl_renderer_tests PRIVATE forma_lvgl_renderer)
-    
-    add_executable(lvgl_renderer_demo
-        tests/lvgl_demo.cpp
-    )
-    target_link_libraries(lvgl_renderer_demo PRIVATE forma_lvgl_renderer)
-    
-    enable_testing()
-    add_test(NAME lvgl_renderer_tests COMMAND lvgl_renderer_tests)
+    # Use bugspray from parent project
+    if(NOT TARGET bugspray-with-main)
+        message(WARNING "bugspray-with-main target not found. Skipping LVGL renderer tests.")
+    else()
+        add_executable(lvgl_renderer_tests
+            tests/lvgl_tests.cpp
+        )
+        target_link_libraries(lvgl_renderer_tests PRIVATE forma_lvgl_renderer bugspray-with-main)
+        
+        add_executable(lvgl_renderer_demo
+            tests/lvgl_demo.cpp
+        )
+        target_link_libraries(lvgl_renderer_demo PRIVATE forma_lvgl_renderer)
+        
+        enable_testing()
+        add_test(NAME lvgl_renderer_tests COMMAND lvgl_renderer_tests)
+    endif()
 endif()
 
 # Installation
