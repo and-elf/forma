@@ -1,5 +1,5 @@
-#include "src/lsp.hpp"
-#include "src/virtual_fs.hpp"
+#include "../src/lsp.hpp"
+#include "../src/virtual_fs.hpp"
 #include <iostream>
 #include <cassert>
 

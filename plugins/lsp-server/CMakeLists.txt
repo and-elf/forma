@@ -53,11 +53,17 @@ target_link_libraries(forma_lsp_server_stdio PRIVATE forma_lsp)
 # Tests (plugin-specific option, independent of core FORMA_BUILD_TESTS)
 option(LSP_SERVER_BUILD_TESTS "Build LSP server plugin tests" OFF)
 if(LSP_SERVER_BUILD_TESTS)
+    # Find bugspray (should be available from parent project)
+    if(NOT TARGET bugspray-with-main)
+        message(FATAL_ERROR "bugspray-with-main target not found. Build forma with tests enabled.")
+    endif()
+    
     add_executable(forma_lsp_tests
         tests/lsp_tests.cpp
+        tests/type_resolution_tests.cpp
         tests/vfs_tests.cpp
     )
-    target_link_libraries(forma_lsp_tests PRIVATE forma_lsp)
+    target_link_libraries(forma_lsp_tests PRIVATE forma_lsp bugspray-with-main)
     
     enable_testing()
     add_test(NAME forma_lsp_tests COMMAND forma_lsp_tests)
