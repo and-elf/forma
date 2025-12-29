@@ -5,6 +5,10 @@ out/
 bin/
 lib/
 
+# Forma project-local directories
+.forma/toolchains/
+.forma/cache/
+
 # CMake
 CMakeCache.txt
 CMakeFiles/
