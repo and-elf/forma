@@ -1,7 +1,7 @@
 // JSON Renderer Plugin
 // Exports Forma documents as JSON for web/debugging
 
-#include "../../src/parser/ir.hpp"
+#include <parser/ir.hpp>
 #include "../../src/plugin_hash.hpp"
 #include <cstdint>
 #include <iostream>
