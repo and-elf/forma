@@ -1,0 +1,17 @@
+# Forma Project Configuration
+
+[project]
+name = "myapp"
+version = "1.0.0"
+renderer = "lvgl"
+build_system = "cmake"
+
+[release]
+# Release packaging system: deb, rpm, etc.
+system = "deb"
+
+# Optional: override default config file location
+# config_file = "debian/package.cfg"
+
+# Optional: output directory for release artifacts
+# output_dir = "dist"

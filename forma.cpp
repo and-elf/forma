@@ -5,6 +5,7 @@
 #include "src/core/assets.hpp"
 #include "src/plugin_loader.hpp"
 #include "src/commands/init.hpp"
+#include "src/commands/release.hpp"
 #include "plugins/tracer/src/tracer_plugin.hpp"
 #include "plugins/lvgl-renderer/src/lvgl_renderer_builtin.hpp"
 #include <iostream>
@@ -16,10 +17,6 @@
 #include <filesystem>
 
 struct CompilerOptions {
-
-#include <fstream>
-#include <sstream>
-#include <string>
     std::string mode = "compile";
     std::string renderer;
     std::vector<std::string> plugins;
@@ -29,6 +26,7 @@ struct CompilerOptions {
     std::string target_triple;
     std::string project_name;
     std::string input_file;
+    std::string release_system;
     bool verbose = false;
     bool debug = false;
     bool list_plugins = false;
@@ -38,9 +36,10 @@ void print_usage(const char* program_name) {
     std::cout << "Forma Programming Language v0.1.0\n\n";
     std::cout << "Usage: " << program_name << " [command] [options] <input-file>\n\n";
     std::cout << "Commands:\n";
-    std::cout << "  init                 Initialize a new Forma project\n\n";
+    std::cout << "  init                 Initialize a new Forma project\n";
+    std::cout << "  release              Build and package project for release\n\n";
     std::cout << "Options:\n";
-    std::cout << "  --mode <mode>        Execution mode: compile, lsp, repl, init\n";
+    std::cout << "  --mode <mode>        Execution mode: compile, lsp, repl, init, release\n";
     std::cout << "  --renderer <name>    Renderer backend: js, sdl, lvgl, vulkan\n";
     std::cout << "  --plugin <path>      Load plugin from shared library (.so)\n";
     std::cout << "  --plugin-dir <path>  Load all plugins from directory\n";
@@ -49,6 +48,7 @@ void print_usage(const char* program_name) {
     std::cout << "  --build <system>     Build system: cmake, meson, bazel\n";
     std::cout << "  --target <triple>    Target architecture (e.g., aarch64-linux-gnu)\n";
     std::cout << "  --name <name>        Project name (for init command)\n";
+    std::cout << "  --release-system <system>  Release packaging system: deb, rpm, etc.\n";
     std::cout << "  -v, --verbose        Enable verbose output\n";
     std::cout << "  --debug              Enable debug output\n";
     std::cout << "  --help               Show this help message\n";
@@ -74,6 +74,8 @@ CompilerOptions parse_arguments(int argc, char* argv[]) {
             std::exit(0);
         } else if (arg == "init") {
             opts.mode = "init";
+        } else if (arg == "release") {
+            opts.mode = "release";
         } else if (arg == "--list-plugins") {
             opts.list_plugins = true;
         } else if (arg == "-v" || arg == "--verbose") {
@@ -97,6 +99,8 @@ CompilerOptions parse_arguments(int argc, char* argv[]) {
             opts.target_triple = argv[++i];
         } else if (arg == "--name" && i + 1 < argc) {
             opts.project_name = argv[++i];
+        } else if (arg == "--release-system" && i + 1 < argc) {
+            opts.release_system = argv[++i];
         } else if (arg[0] != '-') {
             opts.input_file = arg;
         }
@@ -433,6 +437,16 @@ int main(int argc, char* argv[]) {
         init_opts.verbose = opts.verbose;
         
         return forma::commands::run_init_command(init_opts);
+    }
+    
+    // Handle release command early (before compilation)
+    if (opts.mode == "release") {
+        forma::commands::ReleaseOptions release_opts;
+        release_opts.project_dir = opts.project_path.empty() ? "." : opts.project_path;
+        release_opts.release_system = opts.release_system;
+        release_opts.verbose = opts.verbose;
+        
+        return forma::commands::run_release_command(release_opts);
     }
     
     // Configure tracer

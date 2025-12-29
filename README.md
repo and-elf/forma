@@ -399,6 +399,82 @@ Panel {
 
 ## Configuration
 
+Use `forma.toml` or `project.toml` to configure your project:
+
+```toml
+[project]
+name = "myapp"
+version = "1.0.0"
+renderer = "lvgl"
+build_system = "cmake"
+
+[release]
+# Release packaging system: deb, rpm, etc.
+system = "deb"
+```
+
+## CLI Commands
+
+### Initialize a New Project
+
+```bash
+forma init --name myapp --renderer lvgl --build cmake
+```
+
+Creates a new Forma project with:
+- `project.toml` - Project configuration
+- `src/main.fml` - Main application file
+- CMakeLists.txt or other build files
+- Basic directory structure
+
+### Compile Forma Code
+
+```bash
+forma --renderer lvgl myapp.fml
+```
+
+Compiles your Forma code to the target output (C, C++, etc.)
+
+### Release/Package Your Application
+
+```bash
+forma release
+```
+
+Reads the `[release]` section from `project.toml` and automatically builds a release package.
+
+**With explicit release system**:
+```bash
+forma release --release-system deb
+```
+
+**Requirements**:
+- `project.toml` with `[release]` section
+- `package.cfg` with package metadata (for Debian)
+- deb-release plugin built and available
+
+**Example package.cfg**:
+```ini
+name=myapp
+version=1.0.0
+architecture=amd64
+maintainer=Your Name <you@example.com>
+description=My awesome Forma application
+section=utils
+priority=optional
+depends=libc6,libgcc1
+
+[postinst]
+commands=systemctl enable myapp.service
+
+[prerm]
+commands=systemctl stop myapp.service
+```
+
+See `plugins/deb-release/README.md` for full packaging documentation.
+
+## Build Configuration
+
 Use `forma.toml` to configure build targets:
 
 ```toml
