@@ -1,35 +1,34 @@
 #pragma once
-// DEPRECATED: This file has been moved to src/core/toolchain.hpp
-// Please update your includes to use the new location
-#include "../../../src/core/toolchain.hpp"
+#include <string>
+#include <map>
+#include <vector>
+#include <cstdlib>
 
 namespace forma::toolchain {
-// For backwards compatibility
-using ToolchainDownloader = ToolchainManager;
-}
-
 
 struct ToolchainInfo {
     std::string name;
     std::string download_url;
     std::string archive_name;
     std::string bin_dir;  // Relative path to bin directory after extraction
-    std::string compiler_name;  // e.g., "gcc", "x86_64-linux-gnu-gcc"
+    std::string compiler_name;  // e.g., "gcc", "arm-none-eabi-gcc"
+    std::string description;
 };
 
-class ToolchainDownloader {
+class ToolchainManager {
 public:
-    // Map of target triple to toolchain download info
+    // Map of target to toolchain download info
     static std::map<std::string, ToolchainInfo> get_toolchain_database() {
         std::map<std::string, ToolchainInfo> db;
         
-        // x86_64 Linux (native or cross)
+        // x86_64 Linux (native)
         db["x86_64-linux-gnu"] = {
             "GCC 13.2.0 x86_64",
-            "https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/x86_64-arm-none-linux-gnueabihf.tar.xz",
+            "https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz",
             "gcc-x86_64-linux-gnu.tar.xz",
             "bin",
-            "gcc"
+            "gcc",
+            "Native x86_64 Linux GCC compiler"
         };
         
         // ARM64/AArch64 Linux cross-compiler
@@ -38,7 +37,8 @@ public:
             "https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz",
             "gcc-aarch64-linux-gnu.tar.xz",
             "bin",
-            "aarch64-none-linux-gnu-gcc"
+            "aarch64-none-linux-gnu-gcc",
+            "ARM 64-bit Linux cross-compiler"
         };
         
         // ARM 32-bit Linux cross-compiler
@@ -47,7 +47,78 @@ public:
             "https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz",
             "gcc-arm-linux-gnueabihf.tar.xz",
             "bin",
-            "arm-none-linux-gnueabihf-gcc"
+            "arm-none-linux-gnueabihf-gcc",
+            "ARM 32-bit Linux cross-compiler"
+        };
+        
+        // STM32 ARM Cortex-M (bare-metal)
+        db["arm-none-eabi"] = {
+            "GCC 13.2.0 ARM Cortex-M",
+            "https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-eabi.tar.xz",
+            "gcc-arm-none-eabi.tar.xz",
+            "bin",
+            "arm-none-eabi-gcc",
+            "ARM Cortex-M bare-metal (STM32, etc.)"
+        };
+        
+        // STM32 (alias for arm-none-eabi)
+        db["stm32"] = {
+            "GCC 13.2.0 ARM Cortex-M (STM32)",
+            "https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-eabi.tar.xz",
+            "gcc-arm-none-eabi.tar.xz",
+            "bin",
+            "arm-none-eabi-gcc",
+            "STM32 ARM Cortex-M microcontrollers"
+        };
+        
+        // ESP32 Xtensa (managed by ESP-IDF)
+        db["esp32"] = {
+            "ESP32 Xtensa Toolchain",
+            "https://github.com/espressif/crosstool-NG/releases/download/esp-12.2.0_20230208/xtensa-esp32-elf-12.2.0_20230208-x86_64-linux-gnu.tar.xz",
+            "xtensa-esp32-elf.tar.xz",
+            "xtensa-esp32-elf/bin",
+            "xtensa-esp32-elf-gcc",
+            "ESP32 Xtensa LX6 toolchain (WiFi + BT Classic + BLE)"
+        };
+        
+        // ESP32-S2 Xtensa
+        db["esp32s2"] = {
+            "ESP32-S2 Xtensa Toolchain",
+            "https://github.com/espressif/crosstool-NG/releases/download/esp-12.2.0_20230208/xtensa-esp32s2-elf-12.2.0_20230208-x86_64-linux-gnu.tar.xz",
+            "xtensa-esp32s2-elf.tar.xz",
+            "xtensa-esp32s2-elf/bin",
+            "xtensa-esp32s2-elf-gcc",
+            "ESP32-S2 Xtensa LX7 toolchain (WiFi + USB OTG)"
+        };
+        
+        // ESP32-S3 Xtensa
+        db["esp32s3"] = {
+            "ESP32-S3 Xtensa Toolchain",
+            "https://github.com/espressif/crosstool-NG/releases/download/esp-12.2.0_20230208/xtensa-esp32s3-elf-12.2.0_20230208-x86_64-linux-gnu.tar.xz",
+            "xtensa-esp32s3-elf.tar.xz",
+            "xtensa-esp32s3-elf/bin",
+            "xtensa-esp32s3-elf-gcc",
+            "ESP32-S3 Xtensa LX7 toolchain (WiFi + BLE + USB OTG + AI)"
+        };
+        
+        // ESP32-C3 RISC-V
+        db["esp32c3"] = {
+            "ESP32-C3 RISC-V Toolchain",
+            "https://github.com/espressif/crosstool-NG/releases/download/esp-12.2.0_20230208/riscv32-esp-elf-12.2.0_20230208-x86_64-linux-gnu.tar.xz",
+            "riscv32-esp-elf.tar.xz",
+            "riscv32-esp-elf/bin",
+            "riscv32-esp-elf-gcc",
+            "ESP32-C3 RISC-V toolchain (WiFi + BLE + low power)"
+        };
+        
+        // ESP32-C6 RISC-V
+        db["esp32c6"] = {
+            "ESP32-C6 RISC-V Toolchain",
+            "https://github.com/espressif/crosstool-NG/releases/download/esp-12.2.0_20230208/riscv32-esp-elf-12.2.0_20230208-x86_64-linux-gnu.tar.xz",
+            "riscv32-esp-elf.tar.xz",
+            "riscv32-esp-elf/bin",
+            "riscv32-esp-elf-gcc",
+            "ESP32-C6 RISC-V toolchain (WiFi 6 + BLE 5 + Zigbee + Thread)"
         };
         
         // Windows cross-compiler (MinGW-w64)
@@ -56,7 +127,8 @@ public:
             "https://github.com/niXman/mingw-builds-binaries/releases/download/13.2.0-rt_v11-rev0/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev0.7z",
             "mingw-w64-x86_64.7z",
             "mingw64/bin",
-            "x86_64-w64-mingw32-gcc"
+            "x86_64-w64-mingw32-gcc",
+            "Windows 64-bit cross-compiler (MinGW-w64)"
         };
         
         // RISC-V 64-bit
@@ -65,7 +137,8 @@ public:
             "https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2023.11.08/riscv64-glibc-ubuntu-22.04-gcc-nightly-2023.11.08-nightly.tar.gz",
             "gcc-riscv64-linux-gnu.tar.gz",
             "bin",
-            "riscv64-unknown-linux-gnu-gcc"
+            "riscv64-unknown-linux-gnu-gcc",
+            "RISC-V 64-bit Linux cross-compiler"
         };
         
         return db;
@@ -195,6 +268,16 @@ public:
             targets.push_back(pair.first);
         }
         return targets;
+    }
+    
+    // Get toolchain info for a target
+    static ToolchainInfo get_toolchain_info(const std::string& target) {
+        auto db = get_toolchain_database();
+        auto it = db.find(target);
+        if (it != db.end()) {
+            return it->second;
+        }
+        return ToolchainInfo{};
     }
 };
 

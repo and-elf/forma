@@ -1,6 +1,6 @@
 #include "cmake_generator.hpp"
 #include "cmake_downloader.hpp"
-#include "toolchain_downloader.hpp"
+#include "../../../src/core/toolchain.hpp"
 #include <filesystem>
 #include <iostream>
 #include <map>
@@ -71,7 +71,7 @@ void CMakeGenerator::init(BuildContext* ctx) {
         
         // Check if we already have this compiler cached
         if (g_compiler_paths.find(config_.target_triple) == g_compiler_paths.end()) {
-            std::string compiler_path = forma::toolchain::ToolchainDownloader::ensure_compiler_available(config_.target_triple);
+            std::string compiler_path = forma::toolchain::ToolchainManager::ensure_compiler_available(config_.target_triple);
             
             if (compiler_path.empty()) {
                 add_diagnostic("Failed to find or download toolchain for " + config_.target_triple, DiagnosticLevel::Error);

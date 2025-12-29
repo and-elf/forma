@@ -37,6 +37,7 @@ The core provides:
 - `ir.hpp` - Tokenizer, parser, and IR structures
 - `plugin.hpp` - Plugin interface definitions
 - `toml.hpp` - Configuration file parser
+- `core/toolchain.hpp` - Cross-compilation toolchain management
 
 ### Plugin Architecture
 
@@ -53,7 +54,9 @@ Each plugin is a self-contained CMake project that:
 | Plugin | Purpose | Output |
 |--------|---------|--------|
 | **lvgl-renderer** | UI code generation | C99 LVGL code |
-| **lsp-server** | IDE integration | LSP protocol (stdio/HTTP) |
+| **lsp-server** | IDE integration | LSP protocol (stdi
+| **esp32-lvgl** | ESP32 build system | ESP-IDF projects |
+| **deb-release** | Debian packaging | .deb packages |o/HTTP) |
 | **cmake-generator** | Build system | CMakeLists.txt |
 
 **IDE Support**:
@@ -408,9 +411,58 @@ version = "1.0.0"
 renderer = "lvgl"
 build_system = "cmake"
 
+[build]
+target = "esp32s3"
+
+[esp32]
+idf_version = "v5.1"
+auto_install = true
+
 [release]
 # Release packaging system: deb, rpm, etc.
 system = "deb"
+```
+
+### Target Configuration
+
+Forma supports multiple build targets with automatic toolchain management:
+
+**Native Targets**:
+- `x86_64-linux-gnu` - Native x86_64 Linux
+- `aarch64-linux-gnu` - ARM 64-bit Linux
+- `arm-linux-gnueabihf` - ARM 32-bit Linux
+- `x86_64-w64-mingw32` - Windows cross-compile
+- `riscv64-linux-gnu` - RISC-V 64-bit
+
+**Embedded Targets**:
+- `stm32` / `arm-none-eabi` - STM32 ARM Cortex-M (all series)
+- `esp32` - ESP32 (Xtensa LX6, WiFi + BT)
+- `esp32s2` - ESP32-S2 (Xtensa LX7, WiFi + USB)
+- `esp32s3` - ESP32-S3 (Xtensa LX7, WiFi + BLE + AI)
+- `esp32c3` - ESP32-C3 (RISC-V, WiFi + BLE)
+- `esp32c6` - ESP32-C6 (RISC-V, WiFi 6 + Zigbee)
+
+### Automatic Toolchain Management
+
+Forma automatically downloads and manages cross-compilation toolchains. When you specify a target, the toolchain is:
+1. **Checked** on system PATH first
+2. **Downloaded** to `~/.forma/toolchains/` if not found
+3. **Extracted** and made available for build
+
+**Manual toolchain check**:
+```cpp
+#include <forma/core/toolchain.hpp>
+
+// Get supported targets
+auto targets = forma::toolchain::ToolchainManager::get_supported_targets();
+
+// Ensure compiler is available (downloads if needed)
+std::string compiler = forma::toolchain::ToolchainManager::ensure_compiler_available("esp32s3");
+
+// Get toolchain info
+auto info = forma::toolchain::ToolchainManager::get_toolchain_info("stm32");
+std::cout << "Toolchain: " << info.description << "\n";
+std::cout << "Compiler: " << info.compiler_name << "\n";
 ```
 
 ## CLI Commands
@@ -426,6 +478,45 @@ Creates a new Forma project with:
 - `src/main.fml` - Main application file
 - CMakeLists.txt or other build files
 - Basic directory structure
+
+**Embedded Targets**:
+
+```bash
+# Initialize ESP32 project
+forma init --target esp32 --name esp32-project
+
+# Initialize ESP32-S3 project with LVGL
+forma init --target esp32s3 --name esp32s3-project
+
+# Initialize STM32 project
+forma init --target stm32 --name stm32-project
+```
+
+This automatically:
+- Configures the appropriate toolchain (xtensa, arm-none-eabi)
+- Sets up target-specific build system (ESP-IDF, CMake)
+- Downloads required toolchains if not available
+- Creates `project.toml` with target configuration
+
+### Build Your Project
+
+```bash
+forma build
+```
+
+Automatically detects the target from `project.toml` and builds accordingly:
+- **ESP32**: Uses ESP-IDF build system (`idf.py build`)
+- **Native**: Uses CMake build system
+- **STM32**: Uses CMake with ARM Cortex-M toolchain
+
+**ESP32-specific options**:
+```bash
+# Build and flash to device
+forma build --flash
+
+# Build, flash, and monitor serial output
+forma build --flash --monitor
+```
 
 ### Compile Forma Code
 
