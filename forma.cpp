@@ -6,6 +6,7 @@
 #include "src/plugin_loader.hpp"
 #include "src/commands/init.hpp"
 #include "src/commands/release.hpp"
+#include "src/commands/build.hpp"
 #include "plugins/tracer/src/tracer_plugin.hpp"
 #include "plugins/lvgl-renderer/src/lvgl_renderer_builtin.hpp"
 #include <iostream>
@@ -24,6 +25,7 @@ struct CompilerOptions {
     std::string project_path;
     std::string build_system;
     std::string target_triple;
+    std::string target;  // Target platform: esp32, linux, windows, etc.
     std::string project_name;
     std::string input_file;
     std::string release_system;
@@ -37,16 +39,17 @@ void print_usage(const char* program_name) {
     std::cout << "Usage: " << program_name << " [command] [options] <input-file>\n\n";
     std::cout << "Commands:\n";
     std::cout << "  init                 Initialize a new Forma project\n";
+    std::cout << "  build                Build project for target platform\n";
     std::cout << "  release              Build and package project for release\n\n";
     std::cout << "Options:\n";
-    std::cout << "  --mode <mode>        Execution mode: compile, lsp, repl, init, release\n";
+    std::cout << "  --mode <mode>        Execution mode: compile, lsp, repl, init, build, release\n";
     std::cout << "  --renderer <name>    Renderer backend: js, sdl, lvgl, vulkan\n";
     std::cout << "  --plugin <path>      Load plugin from shared library (.so)\n";
     std::cout << "  --plugin-dir <path>  Load all plugins from directory\n";
     std::cout << "  --list-plugins       List all loaded plugins\n";
     std::cout << "  --project <path>     Project directory\n";
     std::cout << "  --build <system>     Build system: cmake, meson, bazel\n";
-    std::cout << "  --target <triple>    Target architecture (e.g., aarch64-linux-gnu)\n";
+    std::cout << "  --target <platform>  Target platform: esp32, esp32s3, linux, windows\n";
     std::cout << "  --name <name>        Project name (for init command)\n";
     std::cout << "  --release-system <system>  Release packaging system: deb, rpm, etc.\n";
     std::cout << "  -v, --verbose        Enable verbose output\n";
@@ -74,6 +77,8 @@ CompilerOptions parse_arguments(int argc, char* argv[]) {
             std::exit(0);
         } else if (arg == "init") {
             opts.mode = "init";
+        } else if (arg == "build") {
+            opts.mode = "build";
         } else if (arg == "release") {
             opts.mode = "release";
         } else if (arg == "--list-plugins") {
@@ -96,7 +101,7 @@ CompilerOptions parse_arguments(int argc, char* argv[]) {
         } else if (arg == "--build" && i + 1 < argc) {
             opts.build_system = argv[++i];
         } else if (arg == "--target" && i + 1 < argc) {
-            opts.target_triple = argv[++i];
+            opts.target = argv[++i];
         } else if (arg == "--name" && i + 1 < argc) {
             opts.project_name = argv[++i];
         } else if (arg == "--release-system" && i + 1 < argc) {
@@ -432,11 +437,24 @@ int main(int argc, char* argv[]) {
         init_opts.project_name = opts.project_name.empty() ? "myapp" : opts.project_name;
         init_opts.build_system = opts.build_system.empty() ? "cmake" : opts.build_system;
         init_opts.target_triple = opts.target_triple;
+        init_opts.target = opts.target;
         init_opts.renderer = opts.renderer.empty() ? "lvgl" : opts.renderer;
         init_opts.project_dir = opts.project_path.empty() ? "." : opts.project_path;
         init_opts.verbose = opts.verbose;
         
         return forma::commands::run_init_command(init_opts);
+    }
+    
+    // Handle build command early
+    if (opts.mode == "build") {
+        forma::commands::BuildOptions build_opts;
+        build_opts.project_dir = opts.project_path.empty() ? "." : opts.project_path;
+        build_opts.target = opts.target;
+        build_opts.verbose = opts.verbose;
+        build_opts.flash = false;  // TODO: Add --flash flag
+        build_opts.monitor = false; // TODO: Add --monitor flag
+        
+        return forma::commands::run_build_command(build_opts);
     }
     
     // Handle release command early (before compilation)

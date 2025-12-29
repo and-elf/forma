@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iostream>
 #include <cstdlib>
+#include <dlfcn.h>
 
 namespace forma::commands {
 
@@ -13,6 +14,7 @@ struct InitOptions {
     std::string project_name = "myapp";
     std::string build_system = "cmake";
     std::string target_triple;  // e.g., "aarch64-linux-gnu" for cross-compilation
+    std::string target;         // e.g., "esp32", "linux", "windows"
     std::string renderer = "lvgl";
     std::string project_dir = ".";
     bool verbose = false;
@@ -38,7 +40,20 @@ std::string generate_project_toml(const InitOptions& opts) {
     
     toml += "[build]\n";
     toml += "# Build system\n";
-    toml += "system = \"" + opts.build_system + "\"\n\n";
+    toml += "system = \"" + opts.build_system + "\"\n";
+    if (!opts.target.empty()) {
+        toml += "target = \"" + opts.target + "\"\n";
+    }
+    toml += "\n";
+    // Add ESP32-specific configuration if target is ESP32
+    if (!opts.target.empty() && opts.target.find("esp32") == 0) {
+        toml += "[esp32]\n";
+        toml += "idf_version = \"v5.1\"\n";
+        toml += "target = \"" + opts.target + "\"\n";
+        toml += "auto_install = true\n";
+        toml += "download_toolchain = true\n\n";
+    }
+    
     
     toml += "# C++ standard version\n";
     toml += "standard = \"c++20\"\n\n";
@@ -315,8 +330,11 @@ int run_init_command(const InitOptions& opts) {
         std::cout << "  Name: " << opts.project_name << std::endl;
         std::cout << "  Build system: " << opts.build_system << std::endl;
         std::cout << "  Renderer: " << opts.renderer << std::endl;
+        if (!opts.target.empty()) {
+            std::cout << "  Target: " << opts.target << std::endl;
+        }
         if (!opts.target_triple.empty()) {
-            std::cout << "  Target: " << opts.target_triple << std::endl;
+            std::cout << "  Target triple: " << opts.target_triple << std::endl;
         }
         std::cout << "  Directory: " << opts.project_dir << std::endl;
         std::cout << std::endl;
@@ -337,6 +355,37 @@ int run_init_command(const InitOptions& opts) {
         ensure_cmake_available(opts.verbose);
     }
     
+    // Handle ESP32 target setup
+    if (!opts.target.empty() && opts.target.find("esp32") == 0) {
+        std::cout << "\n" << "Setting up ESP32 target..." << std::endl;
+        
+        // Call ESP32 plugin setup
+        std::string plugin_path = "plugins/esp32-lvgl/build/forma-esp32-lvgl.so";
+        if (!std::filesystem::exists(plugin_path)) {
+            plugin_path = "build/plugins/esp32-lvgl/forma-esp32-lvgl.so";
+        }
+        
+        if (std::filesystem::exists(plugin_path)) {
+            // Load and call ESP32 setup
+            void* handle = dlopen(plugin_path.c_str(), RTLD_LAZY);
+            if (handle) {
+                typedef bool (*SetupESP32Fn)(const char*, const char*);
+                auto setup_esp32 = (SetupESP32Fn)dlsym(handle, "setup_esp32_project");
+                
+                if (setup_esp32) {
+                    std::string config_file = opts.project_dir + "/forma.toml";
+                    setup_esp32(opts.project_dir.c_str(), config_file.c_str());
+                }
+                
+                dlclose(handle);
+            }
+        } else {
+            std::cout << "Note: ESP32 plugin not found. Project structure created," << std::endl;
+            std::cout << "      but ESP-IDF setup skipped. Build the esp32-lvgl plugin" << std::endl;
+            std::cout << "      and run 'forma init' again to complete ESP32 setup." << std::endl;
+        }
+    }
+    
     // Check for cross-compilation toolchain
     if (!opts.target_triple.empty()) {
         ensure_toolchain_available(opts.target_triple, opts.verbose);
@@ -349,7 +398,16 @@ int run_init_command(const InitOptions& opts) {
         std::cout << "  cd " << opts.project_dir << std::endl;
     }
     
-    std::cout << "  forma src/main.forma" << std::endl;
+    if (!opts.target.empty() && opts.target.find("esp32") == 0) {
+        std::cout << "  source ~/esp/esp-idf/export.sh" << std::endl;
+        std::cout << "  forma build" << std::endl;
+        std::cout << "\nOr to build, flash, and monitor:" << std::endl;
+        std::cout << "  idf.py build flash monitor" << std::endl;
+    } else {
+        std::cout << "  forma src/main.forma" << std::endl;
+        std::cout << "  forma build" << std::endl;
+    }
+    
     std::cout << "\nFor more information, see README.md" << std::endl;
     
     return 0;
