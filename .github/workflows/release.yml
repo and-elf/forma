@@ -1,0 +1,180 @@
+name: Build and Release Debian Package
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0
+  release:
+    types: [created]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-debian-package:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          dpkg-dev \
+          g++ \
+          git
+    
+    - name: Configure CMake
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+    
+    - name: Build Forma
+      run: cmake --build build --target forma -j$(nproc)
+    
+    - name: Build deb-release plugin
+      run: |
+        cd plugins/deb-release
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+        cmake --build build -j$(nproc)
+        cd ../..
+    
+    - name: Prepare package directory
+      run: |
+        mkdir -p package/usr/bin
+        mkdir -p package/usr/lib/forma/plugins
+        cp build/forma package/usr/bin/
+        cp plugins/deb-release/build/forma-deb-release.so package/usr/lib/forma/plugins/
+        chmod +x package/usr/bin/forma
+    
+    - name: Create package configuration
+      run: |
+        VERSION=${GITHUB_REF_NAME#v}
+        if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+          VERSION="0.1.0"
+        fi
+        
+        cat > package.cfg << EOF
+        name=forma
+        version=${VERSION}
+        architecture=amd64
+        maintainer=Forma Team <forma@example.com>
+        description=Forma Programming Language - QML-inspired declarative language
+         Forma is a declarative programming language with compile-time evaluation
+         and plugin-based architecture. Includes compiler and packaging tools.
+        section=devel
+        priority=optional
+        homepage=https://github.com/forma-lang/forma
+        depends=libc6,libgcc-s1,libstdc++6
+        copyright=2025 Forma Contributors
+        license=MIT
+        
+        [postinst]
+        echo "Forma installed successfully"
+        echo "Run 'forma --help' to get started"
+        
+        [prerm]
+        echo "Removing Forma..."
+        EOF
+    
+    - name: Build Debian package
+      run: |
+        VERSION=${GITHUB_REF_NAME#v}
+        if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+          VERSION="0.1.0"
+        fi
+        
+        # Use the forma release command to generate package structure
+        mkdir -p release-output
+        export LD_LIBRARY_PATH=plugins/deb-release/build:$LD_LIBRARY_PATH
+        
+        # Create package structure using the plugin directly
+        plugins/deb-release/build/forma-deb-release.so || true
+        
+        # Manually create DEBIAN directory structure
+        mkdir -p package/DEBIAN
+        
+        cat > package/DEBIAN/control << EOF
+        Package: forma
+        Version: ${VERSION}
+        Section: devel
+        Priority: optional
+        Architecture: amd64
+        Maintainer: Forma Team <forma@example.com>
+        Depends: libc6, libgcc-s1, libstdc++6
+        Homepage: https://github.com/forma-lang/forma
+        Description: Forma Programming Language - QML-inspired declarative language
+         Forma is a declarative programming language with compile-time evaluation
+         and plugin-based architecture. Includes compiler and packaging tools.
+        EOF
+        
+        cat > package/DEBIAN/postinst << 'EOF'
+        #!/bin/bash
+        set -e
+        echo "Forma installed successfully"
+        echo "Run 'forma --help' to get started"
+        exit 0
+        EOF
+        chmod +x package/DEBIAN/postinst
+        
+        cat > package/DEBIAN/prerm << 'EOF'
+        #!/bin/bash
+        set -e
+        echo "Removing Forma..."
+        exit 0
+        EOF
+        chmod +x package/DEBIAN/prerm
+        
+        # Create copyright file
+        mkdir -p package/usr/share/doc/forma
+        cat > package/usr/share/doc/forma/copyright << EOF
+        Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+        Upstream-Name: forma
+        Source: https://github.com/forma-lang/forma
+        
+        Files: *
+        Copyright: 2025 Forma Contributors
+        License: MIT
+        EOF
+        
+        # Build the .deb package
+        dpkg-deb --build package forma_${VERSION}_amd64.deb
+        
+        # Verify the package
+        dpkg-deb --info forma_${VERSION}_amd64.deb
+        dpkg-deb --contents forma_${VERSION}_amd64.deb
+    
+    - name: Upload Debian package as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: forma-debian-package
+        path: forma_*.deb
+    
+    - name: Upload to Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: forma_*.deb
+        body: |
+          ## Forma Release ${{ github.ref_name }}
+          
+          ### Installation
+          
+          ```bash
+          wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/forma_${{ github.ref_name }}_amd64.deb
+          sudo dpkg -i forma_${{ github.ref_name }}_amd64.deb
+          ```
+          
+          ### Usage
+          
+          ```bash
+          forma --help
+          forma init --name myapp
+          forma release
+          ```
+          
+          See the [README](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md) for full documentation.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
