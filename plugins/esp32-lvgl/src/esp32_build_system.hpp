@@ -1,5 +1,6 @@
 #pragma once
 
+#include <core/config.hpp>
 #include <string>
 #include <vector>
 #include <fstream>
@@ -48,11 +49,14 @@ public:
             return true;
         }
         
+        // Load project config to get toolchain directory
+        auto proj_config = forma::config::load_project_config(project_path);
+        std::string toolchain_base = forma::config::get_toolchain_dir(proj_config);
+        
         // Check common installation locations
         std::vector<std::string> common_paths = {
-            std::string(std::getenv("HOME")) + "/esp/esp-idf",
-            "/opt/esp-idf",
-            std::string(std::getenv("HOME")) + "/.espressif/esp-idf"
+            toolchain_base + "/esp-idf",
+            "/opt/esp-idf"
         };
         
         for (const auto& path : common_paths) {
@@ -72,15 +76,19 @@ public:
             return false;
         }
         
-        std::string install_path = std::string(std::getenv("HOME")) + "/esp/esp-idf";
+        // Load project config to get toolchain directory
+        auto proj_config = forma::config::load_project_config(project_path);
+        std::string toolchain_base = forma::config::get_toolchain_dir(proj_config);
+        std::string install_path = toolchain_base + "/esp-idf";
+        
         std::cout << "Installing ESP-IDF " << config.idf_version << " to " << install_path << "\n";
         
-        // Create esp directory
-        std::filesystem::create_directories(std::string(std::getenv("HOME")) + "/esp");
+        // Create toolchain directory
+        forma::config::ensure_directory(toolchain_base);
         
         // Clone ESP-IDF
         std::ostringstream clone_cmd;
-        clone_cmd << "cd " << std::getenv("HOME") << "/esp && "
+        clone_cmd << "cd \"" << toolchain_base << "\" && "
                   << "git clone --recursive --branch " << config.idf_version 
                   << " https://github.com/espressif/esp-idf.git";
         

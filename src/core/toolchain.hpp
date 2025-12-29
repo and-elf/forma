@@ -1,4 +1,6 @@
 #pragma once
+
+#include "config.hpp"
 #include <string>
 #include <map>
 #include <vector>
@@ -223,7 +225,7 @@ public:
     
     // Ensure compiler for target is available, downloading if necessary
     // Returns the full path to the compiler (or just the compiler name if on PATH)
-    static std::string ensure_compiler_available(const std::string& target) {
+    static std::string ensure_compiler_available(const std::string& target, const std::string& project_root = ".") {
         // First check if compiler is on PATH
         if (is_compiler_available(target)) {
             auto db = get_toolchain_database();
@@ -233,17 +235,13 @@ public:
             }
         }
         
-        // Get installation base directory
-        std::string home = std::getenv("HOME") ? std::getenv("HOME") : "";
-#if defined(_WIN32)
-        home = std::getenv("USERPROFILE") ? std::getenv("USERPROFILE") : "";
-#endif
+        // Load project config to get toolchain directory
+        auto config = forma::config::load_project_config(project_root);
+        std::string toolchain_dir = forma::config::get_toolchain_dir(config);
         
-        if (home.empty()) {
-            return ""; // Can't determine home directory
-        }
+        // Ensure toolchain directory exists
+        forma::config::ensure_directory(toolchain_dir);
         
-        std::string toolchain_dir = home + "/.forma/toolchains";
         std::string compiler_path = get_compiler_path(target, toolchain_dir);
         
         // Check if downloaded compiler exists

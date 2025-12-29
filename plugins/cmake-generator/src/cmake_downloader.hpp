@@ -1,11 +1,12 @@
 #pragma once
+#include <core/config.hpp>
 #include <string>
 #include <cstdlib>
 #include <iostream>
 #include <filesystem>
 
 #ifdef FORMA_HAS_DOWNLOAD
-#include "core/download.hpp"
+#include <core/download.hpp>
 #endif
 
 namespace forma::cmake {
@@ -94,24 +95,19 @@ public:
     
     // Ensure cmake is available, downloading if necessary
     // Returns the path to cmake executable
-    static std::string ensure_cmake_available() {
+    static std::string ensure_cmake_available(const std::string& project_root = ".") {
         // First check if cmake is on PATH
         if (is_cmake_available()) {
             return "cmake"; // Use system cmake
         }
         
-        // Check if we have a downloaded copy
-        std::string home = std::getenv("HOME") ? std::getenv("HOME") : "";
-#if defined(_WIN32)
-        home = std::getenv("USERPROFILE") ? std::getenv("USERPROFILE") : "";
-#endif
-        
-        if (home.empty()) {
-            return ""; // Can't determine home directory
-        }
-        
-        std::string cmake_dir = home + "/.forma/tools/cmake";
+        // Load project config to get cache directory
+        auto config = forma::config::load_project_config(project_root);
+        std::string cmake_dir = forma::config::get_cache_dir(config) + "/cmake";
         std::string cmake_bin = get_cmake_path(cmake_dir);
+        
+        // Ensure cache directory exists
+        forma::config::ensure_directory(cmake_dir);
         
         // Check if downloaded cmake exists
         std::string check_cmd = cmake_bin + " --version > /dev/null 2>&1";

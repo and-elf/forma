@@ -25,6 +25,17 @@ optimize = true
 # Output settings
 binary-name = "forma"
 library-name = "libforma"
+directory = "build"
+
+[toolchains]
+# Toolchain storage directory (relative to project root)
+# Downloaded cross-compilers and toolchains are stored here
+directory = ".forma/toolchains"
+auto-download = true
+
+[cache]
+# Cache directory for downloads and temporary files
+directory = ".forma/cache"
 
 [lsp]
 # Language Server Protocol settings

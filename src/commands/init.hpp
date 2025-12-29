@@ -58,14 +58,25 @@ warnings-as-errors = false
 optimize = true
 
 # Output settings
-binary-name = ")" << opts.project_name << "\"\n\n";
+binary-name = ")" << opts.project_name << "\"\n";
+    toml << "directory = \"build\"\n\n";
     
     if (!opts.target_triple.empty()) {
         toml << "# Cross-compilation target\n"
              << "target = \"" << opts.target_triple << "\"\n\n";
     }
     
-    toml << R"([renderer]
+    toml << R"([toolchains]
+# Toolchain storage directory (relative to project root)
+# Downloaded cross-compilers and toolchains are stored here
+directory = ".forma/toolchains"
+auto-download = true
+
+[cache]
+# Cache directory for downloads and temporary files
+directory = ".forma/cache"
+
+[renderer]
 # Rendering backend
 backend = ")" << opts.renderer << R"("
 
