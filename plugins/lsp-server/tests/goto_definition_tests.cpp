@@ -11,25 +11,25 @@ TEST_CASE("LSP - Go to Definition")
         forma::lsp::TextDocumentItem item;
         item.uri = "file:///test.fml";
         item.text = R"(
-Button {
+class CustomWidget {
     property text: string
 }
 
-App {
-    button: Button
+class App {
+    property myWidget: CustomWidget
 }
 )";
         manager.did_open(item);
         
-        // Try to find definition of "Button" at line 6
+        // Try to find definition of "CustomWidget" at line 6 (in the type annotation)
         forma::lsp::Location location;
-        forma::lsp::Position pos(6, 12); // Position at "Button" in "button: Button"
+        forma::lsp::Position pos(6, 23); // Position at "CustomWidget" in "property myWidget: CustomWidget"
         
         bool found = manager.find_definition("file:///test.fml", pos, location);
         
         CHECK(found == true);
         if (found) {
-            CHECK(location.range.start.line == 1);
+            CHECK(location.range.start.line == 1); // Points to "class CustomWidget"
         }
     }
     
@@ -41,22 +41,20 @@ App {
         forma::lsp::TextDocumentItem item;
         item.uri = "file:///test.fml";
         item.text = R"(
-Button {
+class MyButton {
     property enabled: bool
     property text: string
 }
 
-App {
-    myButton: Button {
-        enabled: true
-    }
+myBtn: MyButton {
+    enabled: true
 }
 )";
         manager.did_open(item);
         
-        // Try to find definition of "enabled" at line 8
+        // Try to find definition of "enabled" property
         forma::lsp::Location location;
-        forma::lsp::Position pos(8, 8); // Position at "enabled: true"
+        forma::lsp::Position pos(7, 4); // Position at "enabled: true"
         
         bool found = manager.find_definition("file:///test.fml", pos, location);
         
@@ -73,7 +71,7 @@ App {
         
         forma::lsp::TextDocumentItem item;
         item.uri = "file:///test.fml";
-        item.text = "Button { property text: UnknownType }";
+        item.text = "class Widget { property data: UnknownType }";
         manager.did_open(item);
         
         forma::lsp::Location location;
@@ -92,19 +90,19 @@ App {
         forma::lsp::TextDocumentItem item;
         item.uri = "file:///test.fml";
         item.text = R"(// Comment
-type Color = enum {
+enum Color {
     Red,
     Green,
     Blue
 }
 
-Button {
+class CustomButton {
     property color: Color
 }
 )";
         manager.did_open(item);
         
-        // Try to find definition of "Color" at line 8 (in property declaration)
+        // Try to find definition of "Color" enum at line 8 (in property declaration)
         forma::lsp::Location location;
         forma::lsp::Position pos(8, 20); // Position at "Color" in "property color: Color"
         
@@ -127,7 +125,7 @@ TEST_CASE("LSP - Hover Information")
         forma::lsp::TextDocumentItem item;
         item.uri = "file:///test.fml";
         item.text = R"(
-Button {
+class MyWidget {
     property text: string
 }
 )";
@@ -137,6 +135,6 @@ Button {
         // This test documents expected behavior
         
         // Hover over "text" should show: "property text: string"
-        // Hover over "Button" should show: "type Button"
+        // Hover over "MyWidget" should show: "type MyWidget"
     }
 }
