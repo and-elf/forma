@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../../src/parser/ir.hpp"
+#include <parser/ir.hpp>
 #include <array>
 #include <string_view>
 

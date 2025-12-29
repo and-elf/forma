@@ -2,7 +2,7 @@
 // Makes the LVGL renderer available as a dynamic plugin
 
 #include "lvgl_renderer.hpp"
-#include "../../../src/plugin_hash.hpp"
+#include <plugin_hash.hpp>
 #include <cstdint>
 #include <iostream>
 #include <fstream>

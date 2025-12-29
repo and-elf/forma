@@ -36,6 +36,10 @@ target_include_directories(forma_lsp PUBLIC
     $<INSTALL_INTERFACE:include/forma/plugins/lsp-server>
 )
 
+target_include_directories(forma_lsp PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../src>
+)
+
 # LSP Server executable (HTTP mode)
 add_executable(forma_lsp_server
     src/lsp_server.cpp

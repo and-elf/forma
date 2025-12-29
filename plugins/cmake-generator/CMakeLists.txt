@@ -28,6 +28,10 @@ set_target_properties(forma_cmake_generator PROPERTIES
 
 target_link_libraries(forma_cmake_generator PUBLIC ${FORMA_CORE_TARGET})
 
+target_include_directories(forma_cmake_generator PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../src>
+)
+
 # Link with download support if available
 if(TARGET forma_download)
     target_link_libraries(forma_cmake_generator PRIVATE forma_download)

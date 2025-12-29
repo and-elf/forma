@@ -1,6 +1,6 @@
 #include "cmake_generator.hpp"
 #include "cmake_downloader.hpp"
-#include "../../../src/core/toolchain.hpp"
+#include <core/toolchain.hpp>
 #include <filesystem>
 #include <iostream>
 #include <map>

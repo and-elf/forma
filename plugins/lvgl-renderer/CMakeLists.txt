@@ -35,6 +35,10 @@ target_include_directories(forma_lvgl_renderer PUBLIC
     $<INSTALL_INTERFACE:include/forma/plugins/lvgl-renderer>
 )
 
+target_include_directories(forma_lvgl_renderer PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../src>
+)
+
 # Tests (plugin-specific option, independent of core FORMA_BUILD_TESTS)
 option(LVGL_RENDERER_BUILD_TESTS "Build LVGL renderer plugin tests" ON)
 if(LVGL_RENDERER_BUILD_TESTS)

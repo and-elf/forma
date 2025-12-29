@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../../src/parser/ir.hpp"
-#include "../../../src/parser/semantic.hpp"
+#include <parser/ir.hpp>
+#include <parser/semantic.hpp>
 #include <string_view>
 #include <string>
 #include <array>
