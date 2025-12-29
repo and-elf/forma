@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 project(FormaLSPServer VERSION 1.0.0 LANGUAGES CXX)
 
 # C++20 required
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -66,6 +66,7 @@ if(LSP_SERVER_BUILD_TESTS)
         tests/lsp_tests.cpp
         tests/type_resolution_tests.cpp
         tests/vfs_tests.cpp
+        tests/goto_definition_tests.cpp
     )
     target_link_libraries(forma_lsp_tests PRIVATE forma_lsp bugspray-with-main)
     

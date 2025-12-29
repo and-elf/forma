@@ -5,6 +5,7 @@
 #include <string_view>
 #include <string>
 #include <array>
+#include <memory>
 #include <iostream>
 
 namespace forma::lsp {
@@ -128,7 +129,7 @@ struct LSPDocumentManager {
         
         // Cached parsed document (owned storage)
         std::string cached_source;  // Store the source we last parsed
-        forma::Document<32, 16, 16, 32, 64, 64> cached_ast; // Cached AST with default sizes
+        std::unique_ptr<forma::Document<32, 16, 16, 32, 64, 64>> cached_ast; // Cached AST on heap
         bool cache_valid = false;    // Is the cache valid?
     };
     
@@ -218,7 +219,7 @@ struct LSPDocumentManager {
     // Find definition at position (for go-to-definition)
     bool find_definition(DocumentUri uri, Position pos, Location& out_location) {
         Document* doc = find_document(uri);
-        if (!doc || !doc->cache_valid) {
+        if (!doc || !doc->cache_valid || !doc->cached_ast) {
             std::cerr << "  Debug: Document not found or cache invalid" << std::endl;
             return false;
         }
@@ -235,7 +236,7 @@ struct LSPDocumentManager {
         }
         
         // First, search the symbol table for this identifier
-        const auto& symbols = doc->cached_ast.symbols;
+        const auto& symbols = doc->cached_ast->symbols;
         std::cerr << "  Debug: Searching " << symbols.count << " symbols" << std::endl;
         for (size_t i = 0; i < symbols.count; ++i) {
             const auto& sym = symbols.symbols[i];
@@ -253,9 +254,9 @@ struct LSPDocumentManager {
         }
         
         // If not in symbol table, search type declarations directly
-        std::cerr << "  Debug: Not in symbol table, searching " << doc->cached_ast.type_count << " type declarations" << std::endl;
-        for (size_t i = 0; i < doc->cached_ast.type_count; ++i) {
-            const auto& type = doc->cached_ast.types[i];
+        std::cerr << "  Debug: Not in symbol table, searching " << doc->cached_ast->type_count << " type declarations" << std::endl;
+        for (size_t i = 0; i < doc->cached_ast->type_count; ++i) {
+            const auto& type = doc->cached_ast->types[i];
             std::cerr << "  Debug: Checking type '" << type.name << "'" << std::endl;
             if (type.name == identifier) {
                 // Found type declaration - search for it in source
@@ -275,8 +276,8 @@ struct LSPDocumentManager {
         }
         
         // Search enum declarations
-        for (size_t i = 0; i < doc->cached_ast.enum_count; ++i) {
-            const auto& enum_decl = doc->cached_ast.enums[i];
+        for (size_t i = 0; i < doc->cached_ast->enum_count; ++i) {
+            const auto& enum_decl = doc->cached_ast->enums[i];
             if (enum_decl.name == identifier) {
                 size_t enum_pos = find_in_source(source, identifier);
                 if (enum_pos != std::string_view::npos) {
@@ -292,8 +293,8 @@ struct LSPDocumentManager {
         }
         
         // Search event declarations
-        for (size_t i = 0; i < doc->cached_ast.event_count; ++i) {
-            const auto& event = doc->cached_ast.events[i];
+        for (size_t i = 0; i < doc->cached_ast->event_count; ++i) {
+            const auto& event = doc->cached_ast->events[i];
             if (event.name == identifier) {
                 size_t event_pos = find_in_source(source, identifier);
                 if (event_pos != std::string_view::npos) {
@@ -323,17 +324,23 @@ struct LSPDocumentManager {
         if (need_parse) {
             // Parse and cache
             std::cerr << "  Debug: Parsing document, source length=" << doc.cached_source.size() << std::endl;
-            doc.cached_ast = forma::parse_document(doc.cached_source);
+            auto parsed = forma::parse_document(doc.cached_source);
+            if (!doc.cached_ast) {
+                doc.cached_ast = std::make_unique<forma::Document<32, 16, 16, 32, 64, 64>>();
+            }
+            *doc.cached_ast = parsed;
             doc.cache_valid = true;
-            std::cerr << "  Debug: Parsed - types=" << doc.cached_ast.type_count 
-                     << ", enums=" << doc.cached_ast.enum_count 
-                     << ", events=" << doc.cached_ast.event_count 
-                     << ", symbols=" << doc.cached_ast.symbols.count << std::endl;
+            std::cerr << "  Debug: Parsed - types=" << doc.cached_ast->type_count 
+                     << ", enums=" << doc.cached_ast->enum_count 
+                     << ", events=" << doc.cached_ast->event_count 
+                     << ", symbols=" << doc.cached_ast->symbols.count << std::endl;
         }
         
         // Always run semantic analysis (it's fast and updates diagnostics)
-        auto sem_diagnostics = forma::analyze_document(doc.cached_ast);
-        convert_diagnostics(doc, sem_diagnostics);
+        if (doc.cached_ast) {
+            auto sem_diagnostics = forma::analyze_document(*doc.cached_ast);
+            convert_diagnostics(doc, sem_diagnostics);
+        }
     }
     
 private:
