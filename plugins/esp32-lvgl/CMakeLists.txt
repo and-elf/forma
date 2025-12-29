@@ -11,8 +11,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Plugin library
 add_library(forma_esp32_lvgl SHARED
-    src/esp32_lvgl_renderer.hpp
-    src/esp32_lvgl_plugin.cpp
+    src/esp32_build_system.hpp
+    src/esp32_plugin.cpp
 )
 
 set_target_properties(forma_esp32_lvgl PROPERTIES

@@ -1,0 +1,24 @@
+# Forma ESP32 Project Configuration
+
+[project]
+name = "esp32-demo"
+version = "1.0.0"
+
+[esp32]
+# ESP-IDF version to use (v5.3, v5.2, v5.1, v5.0, v4.4)
+idf_version = "v5.1"
+
+# Target chip (esp32, esp32s2, esp32s3, esp32c3, esp32c6)
+target = "esp32s3"
+
+# Auto-install ESP-IDF if not found
+auto_install = true
+
+# Download toolchain automatically
+download_toolchain = true
+
+# Optional: Manual IDF path (if auto_install = false)
+# idf_path = "/home/user/esp/esp-idf"
+
+# Optional: Custom toolchain path
+# toolchain_path = "/home/user/.espressif/tools"
