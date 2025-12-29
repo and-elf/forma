@@ -242,13 +242,28 @@ struct LSPDocumentManager {
             const auto& sym = symbols.symbols[i];
             
             if (sym.name == identifier) {
-                std::cerr << "  Debug: Found in symbol table at line " << sym.location.line << std::endl;
+                // Convert offset to line/column if needed
+                size_t line, col;
+                if (sym.location.line == 0 && sym.location.column == 0 && sym.location.offset > 0) {
+                    // Location stored as offset, convert it
+                    auto [l, c] = offset_to_position(source, sym.location.offset);
+                    line = l;
+                    col = c;
+                    std::cerr << "  Debug: Found in symbol table at offset " << sym.location.offset 
+                             << " = line " << line << ", col " << col << std::endl;
+                } else {
+                    // Location already has line/column
+                    line = sym.location.line;
+                    col = sym.location.column;
+                    std::cerr << "  Debug: Found in symbol table at line " << line << std::endl;
+                }
+                
                 // Found the definition in symbol table
                 out_location.uri = uri;
-                out_location.range.start.line = static_cast<int>(sym.location.line);
-                out_location.range.start.character = static_cast<int>(sym.location.column);
-                out_location.range.end.line = static_cast<int>(sym.location.line);
-                out_location.range.end.character = static_cast<int>(sym.location.column + sym.name.size());
+                out_location.range.start.line = static_cast<int>(line);
+                out_location.range.start.character = static_cast<int>(col);
+                out_location.range.end.line = static_cast<int>(line);
+                out_location.range.end.character = static_cast<int>(col + sym.name.size());
                 return true;
             }
         }

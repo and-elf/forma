@@ -633,10 +633,12 @@ parse_document(std::string_view source) {
         }
         else if (p.check(TokenKind::Class)) {
             if (doc.type_count < doc.types.size()) {
+                // Capture position of 'class' keyword or type name
+                size_t decl_pos = p.current.pos;
                 auto type = parse_type_decl(p);
-                // Add to symbol table
+                // Add to symbol table with actual source location
                 doc.symbols.add_symbol(Symbol::Kind::Type, type.name, 
-                                      SourceLocation{0, 0, 0, type.name.size()}, 
+                                      SourceLocation{0, 0, decl_pos, type.name.size()}, 
                                       doc.type_count);
                 doc.types[doc.type_count++] = type;
             } else {
@@ -646,10 +648,12 @@ parse_document(std::string_view source) {
         }
         else if (p.check(TokenKind::Enum)) {
             if (doc.enum_count < doc.enums.size()) {
+                // Capture position of 'enum' keyword
+                size_t decl_pos = p.current.pos;
                 auto enum_decl = parse_enum(p);
-                // Add to symbol table
+                // Add to symbol table with actual source location
                 doc.symbols.add_symbol(Symbol::Kind::Enum, enum_decl.name,
-                                      SourceLocation{0, 0, 0, enum_decl.name.size()},
+                                      SourceLocation{0, 0, decl_pos, enum_decl.name.size()},
                                       doc.enum_count);
                 doc.enums[doc.enum_count++] = enum_decl;
             } else {
@@ -659,10 +663,12 @@ parse_document(std::string_view source) {
         }
         else if (p.check(TokenKind::Event)) {
             if (doc.event_count < doc.events.size()) {
+                // Capture position of 'event' keyword
+                size_t decl_pos = p.current.pos;
                 auto event = parse_event(p);
-                // Add to symbol table
+                // Add to symbol table with actual source location
                 doc.symbols.add_symbol(Symbol::Kind::Event, event.name,
-                                      SourceLocation{0, 0, 0, event.name.size()},
+                                      SourceLocation{0, 0, decl_pos, event.name.size()},
                                       doc.event_count);
                 doc.events[doc.event_count++] = event;
             } else {
