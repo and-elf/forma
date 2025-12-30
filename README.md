@@ -341,9 +341,9 @@ forma/
 ## Documentation
 
 - **Core Library**: [src/ir.hpp](src/ir.hpp) - Inline documentation
-- **LVGL Plugin**: [LVGL_RENDERER.md](LVGL_RENDERER.md)
-- **LSP Server**: [LSP_SERVER.md](LSP_SERVER.md)
-- **Virtual FS**: [VIRTUAL_FS.md](VIRTUAL_FS.md)
+- **LVGL Plugin**: [plugins/lvgl-renderer/LVGL_RENDERER.md](plugins/lvgl-renderer/LVGL_RENDERER.md)
+- **LSP Server**: [plugins/lsp-server/LSP_SERVER.md](plugins/lsp-server/LSP_SERVER.md)
+- **Virtual FS**: [plugins/lsp-server/VIRTUAL_FS.md](plugins/lsp-server/VIRTUAL_FS.md)
 - **Plugin Development**: [plugin-template/README.md](plugin-template/README.md)
 - **Plugin Architecture**: [plugins/README.md](plugins/README.md)
 
