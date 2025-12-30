@@ -50,7 +50,10 @@ std::cout << renderer.c_str();
 
 ## Documentation
 
-See [LVGL_RENDERER.md](../../LVGL_RENDERER.md) in the main repository for complete API documentation.
+- [LVGL_RENDERER.md](LVGL_RENDERER.md) - Complete API documentation and usage guide
+- [ANIMATION_IMPLEMENTATION.md](ANIMATION_IMPLEMENTATION.md) - Animation system implementation details
+- [ASSET_BUNDLING.md](ASSET_BUNDLING.md) - Asset bundling with forma:// URI support
+- [HIERARCHICAL_WIDGETS.md](HIERARCHICAL_WIDGETS.md) - Hierarchical widget tree implementation
 
 ## License
 
