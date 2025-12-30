@@ -1,0 +1,100 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Tests with Coverage",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-B",
+        "build",
+        "-DFORMA_BUILD_TESTS=ON",
+        "-DFORMA_ENABLE_COVERAGE=ON",
+        "-DCMAKE_BUILD_TYPE=Debug",
+        "&&",
+        "cmake",
+        "--build",
+        "build",
+        "-j",
+        "$(nproc)"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$gcc"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Run Tests with Coverage",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build",
+        "--target",
+        "coverage"
+      ],
+      "dependsOn": ["Build Tests with Coverage"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Generate Coverage Report (lcov format)",
+      "type": "shell",
+      "command": "gcovr",
+      "args": [
+        "--root",
+        "${workspaceFolder}",
+        "--filter",
+        "${workspaceFolder}/src",
+        "--exclude",
+        "${workspaceFolder}/src/.*/tests/.*",
+        "--lcov",
+        "${workspaceFolder}/build/coverage.lcov"
+      ],
+      "dependsOn": ["Run Tests with Coverage"],
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Run Core Tests",
+      "type": "shell",
+      "command": "ctest",
+      "args": [
+        "--test-dir",
+        "build",
+        "--output-on-failure",
+        "-R",
+        "^(tokenizer|parser|diagnostic|toml)_tests$"
+      ],
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  // CMake Tools configuration
+  "cmake.buildDirectory": "${workspaceFolder}/build",
+  "cmake.configureOnOpen": true,
+  "cmake.configureSettings": {
+    "FORMA_BUILD_TESTS": "ON",
+    "FORMA_ENABLE_COVERAGE": "ON",
+    "FORMA_BUILD_DEMOS": "OFF",
+    "FORMA_BUILD_PLUGINS": "OFF",
+    "CMAKE_BUILD_TYPE": "Debug"
+  },
+  
+  // Test Explorer configuration
+  "testExplorer.useNativeTesting": true,
+  "cmake.ctest.allowParallelJobs": true,
+  
+  // Coverage Gutters configuration
+  "coverage-gutters.coverageFileNames": [
+    "build/coverage.lcov",
+    "coverage.lcov",
+    "lcov.info",
+    "cov.xml",
+    "coverage.xml",
+    "coverage.cobertura.xml"
+  ],
+  "coverage-gutters.showLineCoverage": true,
+  "coverage-gutters.showRulerCoverage": true,
+  
+  // C++ configuration
+  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+  "C_Cpp.default.cppStandard": "c++23"
+}

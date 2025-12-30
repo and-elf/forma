@@ -19,12 +19,28 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(FORMA_BUILD_TESTS "Build compile-time tests" ON)
 option(FORMA_BUILD_PLUGINS "Build bundled plugins" ON)
 option(FORMA_ENABLE_DOWNLOADS "Enable HTTP/HTTPS download support (requires libcurl)" OFF)
+option(FORMA_ENABLE_COVERAGE "Enable code coverage analysis with gcovr" OFF)
 
 # Compiler warnings - Always enabled, warnings are errors
 if(MSVC)
     add_compile_options(/W4 /WX)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# Coverage support
+if(FORMA_ENABLE_COVERAGE)
+    if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(WARNING "Coverage analysis works best with Debug build type")
+    endif()
+    
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options(--coverage -fprofile-arcs -ftest-coverage)
+        add_link_options(--coverage)
+        message(STATUS "Code coverage enabled (gcov/gcovr)")
+    else()
+        message(FATAL_ERROR "Coverage is only supported with GCC or Clang")
+    endif()
 endif()
 
 # ============================================================================
@@ -217,6 +233,41 @@ if(FORMA_BUILD_TESTS)
         DEPENDS forma_tokenizer_tests forma_parser_tests forma_diagnostic_tests forma_toml_tests
         COMMENT "Running all tests..."
     )
+    
+    # Coverage target (requires gcovr)
+    if(FORMA_ENABLE_COVERAGE)
+        find_program(GCOVR_EXECUTABLE gcovr)
+        if(GCOVR_EXECUTABLE)
+            add_custom_target(coverage
+                # Run core tests only (not plugin tests which may not be built)
+                COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^(tokenizer|parser|diagnostic|toml)_tests$$"
+                # Generate HTML coverage report
+                COMMAND ${GCOVR_EXECUTABLE}
+                    --root ${CMAKE_SOURCE_DIR}
+                    --filter ${CMAKE_SOURCE_DIR}/src
+                    --exclude ${CMAKE_SOURCE_DIR}/src/.*/tests/.*
+                    --print-summary
+                    --html-details ${CMAKE_BINARY_DIR}/coverage.html
+                    --html-title "Forma Code Coverage"
+                    --txt ${CMAKE_BINARY_DIR}/coverage.txt
+                # Generate lcov format for VSCode Coverage Gutters extension
+                COMMAND ${GCOVR_EXECUTABLE}
+                    --root ${CMAKE_SOURCE_DIR}
+                    --filter ${CMAKE_SOURCE_DIR}/src
+                    --exclude ${CMAKE_SOURCE_DIR}/src/.*/tests/.*
+                    --lcov ${CMAKE_BINARY_DIR}/coverage.lcov
+                DEPENDS forma_tokenizer_tests forma_parser_tests forma_diagnostic_tests forma_toml_tests
+                WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+                COMMENT "Generating code coverage report with gcovr..."
+                VERBATIM
+            )
+            message(STATUS "Coverage target available: make coverage")
+            message(STATUS "  - HTML report: build/coverage.html")
+            message(STATUS "  - lcov report: build/coverage.lcov (for VSCode)")
+        else()
+            message(WARNING "gcovr not found. Install with: pip install gcovr")
+        endif()
+    endif()
 endif()
 
 # ============================================================================
@@ -246,7 +297,7 @@ endif()
 # Demo Applications
 # ============================================================================
 
-option(FORMA_BUILD_DEMOS "Build demo applications" ON)
+option(FORMA_BUILD_DEMOS "Build demo applications" OFF)
 if(FORMA_BUILD_DEMOS)
     # Forma CLI Tool
     add_executable(forma forma.cpp)

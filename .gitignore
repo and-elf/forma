@@ -29,7 +29,11 @@ _deps/
 *.a
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+!.vscode/COVERAGE_SETUP.md
 .idea/
 *.swp
 *.swo
@@ -39,3 +43,14 @@ _deps/
 # Generated files
 *.log
 *.bak
+
+# Coverage reports
+*.gcov
+*.gcda
+*.gcno
+coverage.lcov
+coverage.html
+coverage*.html
+coverage.txt
+coverage.xml
+coverage.json

@@ -597,6 +597,30 @@ cmake --build build
 ctest --test-dir build
 ```
 
+### Test Coverage
+
+Generate code coverage reports using gcovr:
+
+```bash
+# Install gcovr
+pip install gcovr
+
+# Build with coverage enabled
+cmake -B build -DFORMA_BUILD_TESTS=ON -DFORMA_ENABLE_COVERAGE=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+
+# Run tests and generate coverage report
+cmake --build build --target coverage
+
+# View HTML report
+xdg-open build/coverage.html  # Linux
+open build/coverage.html      # macOS
+```
+
+This generates:
+- `build/coverage.html` - Detailed HTML report with line-by-line coverage
+- `build/coverage.txt` - Text summary of coverage statistics
+
 ## Contributing
 
 1. **Core Library**: Submit PRs to main repository
