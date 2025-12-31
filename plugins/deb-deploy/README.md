@@ -25,38 +25,69 @@ Your workflow:
 
 ## Features
 
-### 1. Create a package configuration file (`package.cfg`):
+## Configuration
 
-```ini
-# Package metadata
-name = myapp
-version = 1.2.3
-maintainer = Your Name <you@example.com>
-description = My awesome application
-architecture = amd64
-section = utils
-priority = optional
-homepage = https://example.com
+### Option 1: Embedded in project.toml or forma.toml
 
-# Dependencies
-depends = libc6 (>= 2.34), libssl3, python3
+Add package metadata directly to your project configuration:
 
-# Copyright
-copyright = 2025 Your Company
-license = MIT
+```toml
+[package]
+name = "myapp"
+version = "1.2.3"
+maintainer = "Your Name <you@example.com>"
+description = "My awesome application"
+architecture = "amd64"
+section = "utils"
+priority = "optional"
+homepage = "https://example.com"
+copyright = "2024 Your Company"
+license = "MIT"
 
-# Post-installation script
-[postinst]
+[deploy]
+# Deployment-specific overrides (optional)
+postinst = """
 systemctl daemon-reload
 systemctl enable myapp.service
+"""
 
-# Pre-removal script
-[prerm]
+prerm = """
 systemctl stop myapp.service
 systemctl disable myapp.service
+"""
 ```
 
-### 2. Build your Forma application:
+### Option 2: Separate package configuration file
+
+Create a dedicated `package.toml` file (see `examples/package.toml`):
+
+```toml
+[package]
+name = "myapp"
+version = "1.2.3"
+maintainer = "Your Name <you@example.com>"
+description = "My awesome application"
+# ... other metadata
+```
+
+### Configuration Fields
+
+- **name**: Package name (lowercase, no spaces)
+- **version**: Version number (e.g., "1.2.3")
+- **maintainer**: Maintainer name and email
+- **description**: Short description
+- **architecture**: Target architecture (amd64, arm64, all, etc.)
+- **section**: Package section (utils, misc, etc.)
+- **priority**: Package priority (optional, standard, important, required)
+- **homepage**: Project website
+- **copyright**: Copyright holder
+- **license**: License type (MIT, GPL-3.0, etc.)
+- **postinst**: Post-installation script
+- **prerm**: Pre-removal script
+- **postrm**: Post-removal script
+- **preinst**: Pre-installation script
+
+## Usage
 
 ```bash
 forma compile myapp.fml -o build/usr/bin/myapp

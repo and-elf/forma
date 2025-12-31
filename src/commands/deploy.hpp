@@ -16,6 +16,12 @@ struct DeployOptions {
     std::vector<std::string> deploy_systems;  // Multiple deployment systems
     std::vector<std::string> architectures;   // Target architectures
     bool verbose = false;
+    
+    // Package metadata overrides (optional, override TOML values)
+    std::string package_name;
+    std::string package_version;
+    std::string maintainer;
+    std::string description;
 };
 
 struct ProjectInfo {

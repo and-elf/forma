@@ -23,6 +23,7 @@ set_target_properties(forma_deb_deploy PROPERTIES
 
 target_include_directories(forma_deb_deploy PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../src>
     $<INSTALL_INTERFACE:include/forma/plugins/deb-deploy>
 )
 

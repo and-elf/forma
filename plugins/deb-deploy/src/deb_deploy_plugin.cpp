@@ -26,9 +26,9 @@ bool create_debian_package(const char* build_dir, const char* source_dir, const 
     
     forma::deb::PackageMetadata meta;
     
-    // Load configuration
-    if (!forma::deb::parse_package_config(config_file, meta)) {
-        std::cerr << "Error: Failed to load package configuration from " << config_file << "\n";
+    // Load configuration from TOML file
+    if (!forma::deb::load_package_metadata(config_file, meta)) {
+        std::cerr << "Error: Failed to load package metadata from " << config_file << "\n";
         return false;
     }
     

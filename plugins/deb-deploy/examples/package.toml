@@ -1,0 +1,42 @@
+# Example TOML configuration for Debian package deployment
+# This file can be embedded in your project.toml or forma.toml
+# Or used as a standalone package configuration
+
+[package]
+name = "myapp"
+version = "1.0.0"
+maintainer = "John Doe <john@example.com>"
+description = "My awesome application built with Forma"
+architecture = "amd64"
+section = "misc"
+priority = "optional"
+homepage = "https://example.com/myapp"
+copyright = "2024 John Doe"
+license = "MIT"
+
+# Deployment-specific overrides (optional)
+# These will override values from [package] during deployment
+[deploy]
+# For example, you might want a different version for release builds
+# version = "1.0.0-release"
+
+# Architecture can be overridden for specific builds
+# architecture = "arm64"
+
+# Post-installation script
+postinst = """
+systemctl daemon-reload
+systemctl enable myapp.service
+systemctl start myapp.service
+"""
+
+# Pre-removal script
+prerm = """
+systemctl stop myapp.service
+systemctl disable myapp.service
+"""
+
+# Post-removal script
+postrm = """
+systemctl daemon-reload
+"""

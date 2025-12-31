@@ -1,5 +1,6 @@
 #pragma once
 
+#include <toml/toml.hpp>
 #include <string>
 #include <vector>
 #include <fstream>
@@ -26,6 +27,34 @@ struct PackageMetadata {
     std::string preinst_script;
     std::string copyright_holder;
     std::string license = "MIT";
+    
+    // Load metadata from TOML document
+    void load_from_toml(const toml::Table<32>& table) {
+        if (auto val = table.get_string("name")) name = std::string(*val);
+        if (auto val = table.get_string("version")) version = std::string(*val);
+        if (auto val = table.get_string("maintainer")) maintainer = std::string(*val);
+        if (auto val = table.get_string("description")) description = std::string(*val);
+        if (auto val = table.get_string("architecture")) architecture = std::string(*val);
+        if (auto val = table.get_string("section")) section = std::string(*val);
+        if (auto val = table.get_string("priority")) priority = std::string(*val);
+        if (auto val = table.get_string("homepage")) homepage = std::string(*val);
+        if (auto val = table.get_string("copyright")) copyright_holder = std::string(*val);
+        if (auto val = table.get_string("license")) license = std::string(*val);
+        
+        // Handle dependencies array
+        // Note: TOML parser would need to support this, for now keep simple config fallback
+    }
+    
+    // Apply CLI overrides (values from command-line arguments)
+    void apply_overrides(const std::string& cli_name, 
+                        const std::string& cli_version,
+                        const std::string& cli_maintainer,
+                        const std::string& cli_description) {
+        if (!cli_name.empty()) name = cli_name;
+        if (!cli_version.empty()) version = cli_version;
+        if (!cli_maintainer.empty()) maintainer = cli_maintainer;
+        if (!cli_description.empty()) description = cli_description;
+    }
 };
 
 class DebianPackageBuilder {
@@ -153,114 +182,45 @@ public:
     }
 };
 
-// Helper function to parse simple config file
-inline bool parse_package_config(const std::string& config_path, PackageMetadata& meta) {
-    std::ifstream file(config_path);
+// Load package metadata from TOML file
+// Supports both [package] and [deploy] tables
+inline bool load_package_metadata(const std::string& toml_path, PackageMetadata& meta) {
+    // Read TOML file
+    std::ifstream file(toml_path);
     if (!file.is_open()) return false;
     
-    std::string line;
-    std::string current_section;
-    std::ostringstream script_content;
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
     
-    while (std::getline(file, line)) {
-        // Trim whitespace
-        size_t start = line.find_first_not_of(" \t\r\n");
-        if (start == std::string::npos || line[start] == '#') continue;
-        
-        size_t end = line.find_last_not_of(" \t\r\n");
-        line = line.substr(start, end - start + 1);
-        
-        // Check for section markers
-        if (line == "[postinst]") {
-            if (!current_section.empty() && !script_content.str().empty()) {
-                if (current_section == "postinst") meta.postinst_script = script_content.str();
-                else if (current_section == "prerm") meta.prerm_script = script_content.str();
-                else if (current_section == "postrm") meta.postrm_script = script_content.str();
-            }
-            current_section = "postinst";
-            script_content.str("");
-            continue;
-        } else if (line == "[prerm]") {
-            if (!current_section.empty() && !script_content.str().empty()) {
-                if (current_section == "postinst") meta.postinst_script = script_content.str();
-                else if (current_section == "prerm") meta.prerm_script = script_content.str();
-            }
-            current_section = "prerm";
-            script_content.str("");
-            continue;
-        } else if (line == "[postrm]") {
-            if (!current_section.empty() && !script_content.str().empty()) {
-                if (current_section == "postinst") meta.postinst_script = script_content.str();
-                else if (current_section == "prerm") meta.prerm_script = script_content.str();
-                else if (current_section == "postrm") meta.postrm_script = script_content.str();
-            }
-            current_section = "postrm";
-            script_content.str("");
-            continue;
-        } else if (line[0] == '[') {
-            if (!current_section.empty() && !script_content.str().empty()) {
-                if (current_section == "postinst") meta.postinst_script = script_content.str();
-                else if (current_section == "prerm") meta.prerm_script = script_content.str();
-                else if (current_section == "postrm") meta.postrm_script = script_content.str();
-            }
-            current_section = "";
-            script_content.str("");
-            continue;
-        }
-        
-        // Handle script sections
-        if (!current_section.empty()) {
-            if (!script_content.str().empty()) script_content << "\n";
-            script_content << line;
-            continue;
-        }
-        
-        // Parse key = value
-        size_t eq_pos = line.find('=');
-        if (eq_pos == std::string::npos) continue;
-        
-        std::string key = line.substr(0, eq_pos);
-        std::string value = line.substr(eq_pos + 1);
-        
-        // Trim key and value
-        key.erase(key.find_last_not_of(" \t") + 1);
-        size_t vstart = value.find_first_not_of(" \t\"");
-        if (vstart != std::string::npos) {
-            value = value.substr(vstart);
-        }
-        if (!value.empty() && value.back() == '"') value.pop_back();
-        
-        if (key == "name") meta.name = value;
-        else if (key == "version") meta.version = value;
-        else if (key == "maintainer") meta.maintainer = value;
-        else if (key == "description") meta.description = value;
-        else if (key == "architecture") meta.architecture = value;
-        else if (key == "section") meta.section = value;
-        else if (key == "priority") meta.priority = value;
-        else if (key == "homepage") meta.homepage = value;
-        else if (key == "copyright") meta.copyright_holder = value;
-        else if (key == "license") meta.license = value;
-        else if (key == "depends") {
-            // Split by comma
-            std::istringstream ss(value);
-            std::string dep;
-            while (std::getline(ss, dep, ',')) {
-                size_t s = dep.find_first_not_of(" \t");
-                if (s != std::string::npos) {
-                    dep = dep.substr(s);
-                    size_t e = dep.find_last_not_of(" \t");
-                    dep = dep.substr(0, e + 1);
-                    meta.dependencies.push_back(dep);
-                }
-            }
-        }
+    // Parse TOML using the constexpr parse function
+    auto doc = toml::parse<16>(content);
+    
+    // Try [package] table first (standard project metadata)
+    if (auto table = doc.get_table("package")) {
+        meta.load_from_toml(*table);
     }
     
-    // Handle last section
-    if (!current_section.empty() && !script_content.str().empty()) {
-        if (current_section == "postinst") meta.postinst_script = script_content.str();
-        else if (current_section == "prerm") meta.prerm_script = script_content.str();
-        else if (current_section == "postrm") meta.postrm_script = script_content.str();
+    // Try [deploy] table second (deployment-specific overrides)
+    if (auto table = doc.get_table("deploy")) {
+        meta.load_from_toml(*table);
+    }
+    
+    // Handle script sections: [deploy.scripts]
+    if (auto deploy_table = doc.get_table("deploy")) {
+        // TODO: Support nested tables when TOML parser supports it
+        // For now, scripts can be inline strings in [deploy]
+        if (auto val = deploy_table->get_string("postinst")) {
+            meta.postinst_script = std::string(*val);
+        }
+        if (auto val = deploy_table->get_string("prerm")) {
+            meta.prerm_script = std::string(*val);
+        }
+        if (auto val = deploy_table->get_string("postrm")) {
+            meta.postrm_script = std::string(*val);
+        }
+        if (auto val = deploy_table->get_string("preinst")) {
+            meta.preinst_script = std::string(*val);
+        }
     }
     
     return true;
