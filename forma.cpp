@@ -5,10 +5,11 @@
 #include "src/core/assets.hpp"
 #include "src/plugin_loader.hpp"
 #include "src/commands/init.hpp"
-#include "src/commands/release.hpp"
+#include "src/commands/deploy.hpp"
 #include "src/commands/build.hpp"
 #include "plugins/tracer/src/tracer_plugin.hpp"
 #include "plugins/lvgl-renderer/src/lvgl_renderer_builtin.hpp"
+#include <CLI/CLI.hpp>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -29,97 +30,12 @@ struct CompilerOptions {
     std::string project_name;
     std::string plugin_type;  // Plugin type for init plugin
     std::string input_file;
-    std::string release_system;
+    std::string deploy_system;
     bool verbose = false;
     bool debug = false;
     bool list_plugins = false;
     bool is_plugin = false;  // true for forma init plugin
 };
-
-void print_usage(const char* program_name) {
-    std::cout << "Forma Programming Language v0.1.0\n\n";
-    std::cout << "Usage: " << program_name << " [command] [options] <input-file>\n\n";
-    std::cout << "Commands:\n";
-    std::cout << "  init                 Initialize a new Forma project\n";
-    std::cout << "  init plugin          Initialize a new Forma plugin\n";
-    std::cout << "  build                Build project for target platform\n";
-    std::cout << "  release              Build and package project for release\n\n";
-    std::cout << "Options:\n";
-    std::cout << "  --mode <mode>        Execution mode: compile, lsp, repl, init, build, deploy\n";
-    std::cout << "  --renderer <name>    Renderer backend: js, sdl, lvgl, vulkan\n";
-    std::cout << "  --plugin <path>      Load plugin from shared library (.so)\n";
-    std::cout << "  --plugin-dir <path>  Load all plugins from directory\n";
-    std::cout << "  --list-plugins       List all loaded plugins\n";
-    std::cout << "  --project <path>     Project directory\n";
-    std::cout << "  --build <system>     Build system: cmake, meson, bazel\n";
-    std::cout << "  --target <platform>  Target platform: esp32, esp32s3, linux, windows\n";
-    std::cout << "  --name <name>        Project/plugin name (for init command)\n";
-    std::cout << "  --type <type>        Plugin type: renderer, lsp, build (for init plugin)\n";
-    std::cout << "  --release-system <system>  Release packaging system: deb, rpm, etc.\n";
-    std::cout << "  -v, --verbose        Enable verbose output\n";
-    std::cout << "  --debug              Enable debug output\n";
-    std::cout << "  --help               Show this help message\n";
-    std::cout << "  --version            Show version information\n";
-}
-
-void print_version() {
-    std::cout << "Forma v0.1.0\n";
-    std::cout << "A QML-inspired programming language\n";
-}
-
-CompilerOptions parse_arguments(int argc, char* argv[]) {
-    CompilerOptions opts;
-    
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        
-        if (arg == "--help" || arg == "-h") {
-            print_usage(argv[0]);
-            std::exit(0);
-        } else if (arg == "--version") {
-            print_version();
-            std::exit(0);
-        } else if (arg == "init") {
-            opts.mode = "init";
-            if (i + 1 < argc && std::string(argv[i + 1]) == "plugin") {
-                opts.is_plugin = true;
-                ++i;
-            }
-        } else if (arg == "build") {
-            opts.mode = "build";
-        } else if (arg == "deploy") {
-            opts.mode = "deploy";
-        } else if (arg == "--list-plugins") {
-            opts.list_plugins = true;
-        } else if (arg == "-v" || arg == "--verbose") {
-            opts.verbose = true;
-        } else if (arg == "--debug") {
-            opts.debug = true;
-            opts.verbose = true;
-        } else if (arg == "--mode" && i + 1 < argc) {
-            opts.mode = argv[++i];
-        } else if (arg == "--renderer" && i + 1 < argc) {
-            opts.renderer = argv[++i];
-        } else if (arg == "--plugin" && i + 1 < argc) {
-            opts.plugins.push_back(argv[++i]);
-        } else if (arg == "--plugin-dir" && i + 1 < argc) {
-            opts.plugin_dirs.push_back(argv[++i]);
-        } else if (arg == "--project" && i + 1 < argc) {
-            opts.project_path = argv[++i];
-        } else if (arg == "--build" && i + 1 < argc) {
-            opts.build_system = argv[++i];
-        } else if (arg == "--target" && i + 1 < argc) {
-            opts.target = argv[++i];
-        } else if (arg == "--name" && i + 1 < argc) {
-            opts.project_name = argv[++i];
-        } else if (arg == "--type\" && i + 1 < argc) {\n            opts.plugin_type = argv[++i];\n        } else if (arg == \"--deploy-system\" && i + 1 < argc) {\n            opts.deploy_system = argv[++i];
-        } else if (arg[0] != '-') {
-            opts.input_file = arg;
-        }
-    }
-    
-    return opts;
-}
 
 int load_plugins(forma::PluginLoader& plugin_loader, const std::vector<std::string>& plugin_paths,
                  forma::tracer::TracerPlugin*& active_tracer) {
@@ -248,22 +164,7 @@ void resolve_imports(DocType& doc, const std::string& input_file, forma::tracer:
         }
     }
     
-    // Merge all imported documents into main document
-    for (const auto& imported : imported_docs) {
-        for (size_t i = 0; i < imported.type_count && doc.type_count < doc.types.size(); ++i) {
-            doc.types[doc.type_count++] = imported.types[i];
-        }
-        for (size_t i = 0; i < imported.enum_count && doc.enum_count < doc.enums.size(); ++i) {
-            doc.enums[doc.enum_count++] = imported.enums[i];
-        }
-        for (size_t i = 0; i < imported.event_count && doc.event_count < doc.events.size(); ++i) {
-            doc.events[doc.event_count++] = imported.events[i];
-        }
-    }
-    
     tracer.stat("Total files loaded", loaded_files.size());
-    tracer.stat("Total types", doc.type_count);
-    tracer.stat("Total enums", doc.enum_count);
     tracer.end_stage();
 }
 
@@ -430,15 +331,72 @@ int generate_code(const DocType& doc, const std::string& input_file,
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        print_usage(argv[0]);
-        return 1;
+    CLI::App app{"Forma Programming Language v0.1.0"};
+    app.set_version_flag("--version", "0.1.0");
+    app.footer("A QML-inspired programming language");
+
+    CompilerOptions opts;
+    
+    // Global options
+    app.add_flag("-v,--verbose", opts.verbose, "Enable verbose output");
+    app.add_flag("--debug", opts.debug, "Enable debug output");
+    app.add_option("--renderer", opts.renderer, "Renderer backend: js, sdl, lvgl, vulkan");
+    app.add_option("--plugin", opts.plugins, "Load plugin from shared library (.so)")->expected(1, -1);
+    app.add_option("--plugin-dir", opts.plugin_dirs, "Load all plugins from directory")->expected(1, -1);
+    app.add_flag("--list-plugins", opts.list_plugins, "List all loaded plugins");
+    app.add_option("--project", opts.project_path, "Project directory");
+    app.add_option("input_file", opts.input_file, "Input file");
+    
+    // Allow global options to be used with subcommands
+    app.allow_extras();
+
+    // Init command
+    auto* init_cmd = app.add_subcommand("init", "Initialize a new Forma project");
+    init_cmd->add_option("--name", opts.project_name, "Project name");
+    init_cmd->add_option("--build", opts.build_system, "Build system: cmake, meson, bazel");
+    init_cmd->add_option("--target", opts.target, "Target platform: esp32, esp32s3, linux, windows");
+    init_cmd->add_option("--project", opts.project_path, "Project directory");
+    init_cmd->callback([&opts]() { opts.mode = "init"; });
+
+    // Init plugin subcommand
+    auto* init_plugin_cmd = app.add_subcommand("init-plugin", "Initialize a new Forma plugin");
+    init_plugin_cmd->add_option("--name", opts.project_name, "Plugin name");
+    init_plugin_cmd->add_option("--type", opts.plugin_type, "Plugin type: renderer, lsp, build");
+    init_plugin_cmd->add_option("--project", opts.project_path, "Project directory");
+    init_plugin_cmd->callback([&opts]() { 
+        opts.mode = "init"; 
+        opts.is_plugin = true;
+    });
+
+    // Build command
+    auto* build_cmd = app.add_subcommand("build", "Build project for target platform");
+    build_cmd->add_option("--target", opts.target, "Target platform");
+    build_cmd->add_option("--project", opts.project_path, "Project directory");
+    build_cmd->callback([&opts]() { opts.mode = "build"; });
+
+    // Deploy command
+    auto* deploy_cmd = app.add_subcommand("deploy", "Build and package project for deployment");
+    deploy_cmd->add_option("--deploy-system", opts.deploy_system, "Deploy packaging system: deb, rpm, etc.");
+    deploy_cmd->add_option("--project", opts.project_path, "Project directory");
+    deploy_cmd->callback([&opts]() { opts.mode = "deploy"; });
+
+    // Compile command (default)
+    auto* compile_cmd = app.add_subcommand("compile", "Compile Forma source file");
+    compile_cmd->add_option("--mode", opts.mode, "Execution mode: compile, lsp, repl")->default_val("compile");
+
+    // Parse arguments
+    try {
+        app.parse(argc, argv);
+    } catch (const CLI::ParseError &e) {
+        return app.exit(e);
     }
 
-    // Parse command line arguments
-    auto opts = parse_arguments(argc, argv);
-    
-    // Handle init command early (before loading plugins or files)
+    // Handle debug flag
+    if (opts.debug) {
+        opts.verbose = true;
+    }
+
+    // Handle init command
     if (opts.mode == "init") {
         forma::commands::InitOptions init_opts;
         init_opts.project_name = opts.project_name.empty() ? (opts.is_plugin ? "myplugin" : "myapp") : opts.project_name;
@@ -459,7 +417,7 @@ int main(int argc, char* argv[]) {
         return forma::commands::run_init_command(init_opts);
     }
     
-    // Handle build command early
+    // Handle build command
     if (opts.mode == "build") {
         forma::commands::BuildOptions build_opts;
         build_opts.project_dir = opts.project_path.empty() ? "." : opts.project_path;
@@ -471,7 +429,7 @@ int main(int argc, char* argv[]) {
         return forma::commands::run_build_command(build_opts);
     }
     
-    // Handle deploy command early (before compilation)
+    // Handle deploy command
     if (opts.mode == "deploy") {
         forma::commands::DeployOptions deploy_opts;
         deploy_opts.project_dir = opts.project_path.empty() ? "." : opts.project_path;
@@ -496,7 +454,6 @@ int main(int argc, char* argv[]) {
     forma::tracer::TracerPlugin* active_tracer = &tracer;
     
     // Register built-in LVGL renderer plugin with inline metadata
-    // (since TOML parser is currently disabled)
     auto lvgl_metadata = std::make_unique<forma::PluginMetadata>();
     lvgl_metadata->name = "lvgl";
     lvgl_metadata->kind = "renderer";
@@ -528,7 +485,7 @@ int main(int argc, char* argv[]) {
     // Validate input file
     if (opts.input_file.empty()) {
         active_tracer->error("No input file specified");
-        print_usage(argv[0]);
+        std::cout << app.help() << std::endl;
         return 1;
     }
 

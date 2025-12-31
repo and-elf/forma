@@ -52,6 +52,17 @@ include(cmake/CPM.cmake)
 # External Dependencies
 # ============================================================================
 
+# CLI11 - Command-line parsing library
+CPMAddPackage(
+    NAME CLI11
+    GITHUB_REPOSITORY CLIUtils/CLI11
+    VERSION 2.4.1
+    OPTIONS
+        "CLI11_BUILD_DOCS OFF"
+        "CLI11_BUILD_TESTS OFF"
+        "CLI11_BUILD_EXAMPLES OFF"
+)
+
 # Bugspray testing framework
 add_subdirectory(external/bugspray EXCLUDE_FROM_ALL)
 
@@ -192,7 +203,7 @@ option(FORMA_BUILD_DEMOS "Build demo applications" OFF)
 if(FORMA_BUILD_DEMOS)
     # Forma CLI Tool
     add_executable(forma forma.cpp)
-    target_link_libraries(forma PRIVATE forma_core)
+    target_link_libraries(forma PRIVATE forma_core CLI11::CLI11)
     target_compile_features(forma PRIVATE cxx_std_20)
     
     # Parser Demo
