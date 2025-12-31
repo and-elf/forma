@@ -91,7 +91,7 @@ int call_deb_deploy_plugin(const std::string& project_dir, forma::tracer::Tracer
     
     if (!found) {
         tracer.error("deb-deploy plugin not found. Build it first with:");
-        tracer.info("  cd plugins/deb-release && cmake -B build && cmake --build build");
+        tracer.info("  cd plugins/deb-deploy && cmake -B build && cmake --build build");
         tracer.info("Or install it system-wide.");
         tracer.info("Searched paths:");
         for (const auto& path : plugin_paths) {
