@@ -1,5 +1,5 @@
 #include <bugspray/bugspray.hpp>
-#include "../src/deb_release.hpp"
+#include "../src/deb_deploy.hpp"
 #include <fstream>
 
 using namespace forma::deb;

@@ -19,7 +19,7 @@ Generates Debian .deb packages from built applications. This plugin handles pack
 Your workflow:
 1. Write UI in app.fml
 2. Compile: forma compile app.fml → binary
-3. Package: deb-release plugin → .deb file
+3. Package: deb-deploy plugin → .deb file
 4. Distribute: apt install your-app.deb
 ```
 
@@ -62,7 +62,7 @@ systemctl disable myapp.service
 forma compile myapp.fml -o build/usr/bin/myapp
 ```
 
-### 3. Run the deb-release plugin:
+### 3. Run the deb-deploy plugin:
 
 ```bash
 # Plugin will create DEBIAN/ structure in build directory
@@ -121,15 +121,15 @@ Scripts are defined in sections and will be executed with `#!/bin/bash`:
 ```bash
 mkdir build && cd build
 cmake ..
-make forma_deb_release
+make forma_deb_deploy
 ```
 
 ## Testing
 
 ```bash
 cd build
-make deb_release_tests
-./plugins/deb-release/deb_release_tests
+make deb_deploy_tests
+./plugins/deb-deploy/deb_deploy_tests
 ```
 
 ## Example
@@ -177,10 +177,10 @@ Copyright {
 }
 ```
 
-Then compile with the deb-release plugin:
+Then compile with the deb-deploy plugin:
 
 ```bash
-forma compile mypackage.fml --plugin deb-release --output build/
+forma compile mypackage.fml --plugin deb-deploy --output build/
 dpkg-deb --build build/
 ```
 
@@ -230,13 +230,13 @@ build/
 ```bash
 mkdir build && cd build
 cmake ..
-make forma_deb_release
+make forma_deb_deploy
 ```
 
 ## Testing
 
 ```bash
 cd build
-make deb_release_tests
-./plugins/deb-release/deb_release_tests
+make deb_deploy_tests
+./plugins/deb-deploy/deb_deploy_tests
 ```

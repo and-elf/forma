@@ -45,7 +45,7 @@ void print_usage(const char* program_name) {
     std::cout << "  build                Build project for target platform\n";
     std::cout << "  release              Build and package project for release\n\n";
     std::cout << "Options:\n";
-    std::cout << "  --mode <mode>        Execution mode: compile, lsp, repl, init, build, release\n";
+    std::cout << "  --mode <mode>        Execution mode: compile, lsp, repl, init, build, deploy\n";
     std::cout << "  --renderer <name>    Renderer backend: js, sdl, lvgl, vulkan\n";
     std::cout << "  --plugin <path>      Load plugin from shared library (.so)\n";
     std::cout << "  --plugin-dir <path>  Load all plugins from directory\n";
@@ -87,8 +87,8 @@ CompilerOptions parse_arguments(int argc, char* argv[]) {
             }
         } else if (arg == "build") {
             opts.mode = "build";
-        } else if (arg == "release") {
-            opts.mode = "release";
+        } else if (arg == "deploy") {
+            opts.mode = "deploy";
         } else if (arg == "--list-plugins") {
             opts.list_plugins = true;
         } else if (arg == "-v" || arg == "--verbose") {
@@ -112,10 +112,7 @@ CompilerOptions parse_arguments(int argc, char* argv[]) {
             opts.target = argv[++i];
         } else if (arg == "--name" && i + 1 < argc) {
             opts.project_name = argv[++i];
-        } else if (arg == "--type" && i + 1 < argc) {
-            opts.plugin_type = argv[++i];
-        } else if (arg == "--release-system" && i + 1 < argc) {
-            opts.release_system = argv[++i];
+        } else if (arg == "--type\" && i + 1 < argc) {\n            opts.plugin_type = argv[++i];\n        } else if (arg == \"--deploy-system\" && i + 1 < argc) {\n            opts.deploy_system = argv[++i];
         } else if (arg[0] != '-') {
             opts.input_file = arg;
         }
@@ -474,14 +471,14 @@ int main(int argc, char* argv[]) {
         return forma::commands::run_build_command(build_opts);
     }
     
-    // Handle release command early (before compilation)
-    if (opts.mode == "release") {
-        forma::commands::ReleaseOptions release_opts;
-        release_opts.project_dir = opts.project_path.empty() ? "." : opts.project_path;
-        release_opts.release_system = opts.release_system;
-        release_opts.verbose = opts.verbose;
-        
-        return forma::commands::run_release_command(release_opts);
+    // Handle deploy command early (before compilation)
+    if (opts.mode == "deploy") {
+        forma::commands::DeployOptions deploy_opts;
+        deploy_opts.project_dir = opts.project_path.empty() ? "." : opts.project_path;
+        deploy_opts.deploy_system = opts.deploy_system;
+        deploy_opts.verbose = opts.verbose;
+
+        return forma::commands::run_deploy_command(deploy_opts);
     }
     
     // Configure tracer

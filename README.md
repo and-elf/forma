@@ -56,7 +56,7 @@ Each plugin is a self-contained CMake project that:
 | **lvgl-renderer** | UI code generation | C99 LVGL code |
 | **lsp-server** | IDE integration | LSP protocol (stdi
 | **esp32-lvgl** | ESP32 build system | ESP-IDF projects |
-| **deb-release** | Debian packaging | .deb packages |o/HTTP) |
+| **deb-deploy** | Debian packaging | .deb packages |o/HTTP) |
 | **cmake-generator** | Build system | CMakeLists.txt |
 
 **IDE Support**:
@@ -418,8 +418,8 @@ target = "esp32s3"
 idf_version = "v5.1"
 auto_install = true
 
-[release]
-# Release packaging system: deb, rpm, etc.
+[deploy]
+# Deploy packaging system: deb, rpm, etc.
 system = "deb"
 ```
 
@@ -532,7 +532,7 @@ Compiles your Forma code to the target output (C, C++, etc.)
 forma release
 ```
 
-Reads the `[release]` section from `project.toml` and automatically builds a release package.
+Reads the `[deploy]` section from `project.toml` and automatically builds a release package.
 
 **With explicit release system**:
 ```bash
@@ -540,9 +540,9 @@ forma release --release-system deb
 ```
 
 **Requirements**:
-- `project.toml` with `[release]` section
+- `project.toml` with `[deploy]` section
 - `package.cfg` with package metadata (for Debian)
-- deb-release plugin built and available
+- deb-deploy plugin built and available
 
 **Example package.cfg**:
 ```ini
@@ -562,7 +562,7 @@ commands=systemctl enable myapp.service
 commands=systemctl stop myapp.service
 ```
 
-See `plugins/deb-release/README.md` for full packaging documentation.
+See `plugins/deb-deploy/README.md` for full packaging documentation.
 
 ## Build Configuration
 

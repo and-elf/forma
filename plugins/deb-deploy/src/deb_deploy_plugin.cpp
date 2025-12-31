@@ -1,11 +1,11 @@
-#include "deb_release.hpp"
+#include "deb_deploy.hpp"
 #include <iostream>
 #include <cstring>
 
 extern "C" {
 
 const char* get_plugin_name() {
-    return "deb-release";
+    return "deb-deploy";
 }
 
 const char* get_plugin_version() {

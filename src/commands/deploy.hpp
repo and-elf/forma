@@ -11,14 +11,14 @@
 
 namespace forma::commands {
 
-struct ReleaseOptions {
+struct DeployOptions {
     std::string project_dir;
-    std::string release_system;  // Override from command line
+    std::string deploy_system;  // Override from command line
     bool verbose = false;
 };
 
-// Read project.toml and extract release configuration
-std::string read_release_config(const std::string& project_dir, forma::tracer::TracerPlugin& tracer) {
+// Read project.toml and extract deployment configuration
+std::string read_deploy_config(const std::string& project_dir, forma::tracer::TracerPlugin& tracer) {
     std::filesystem::path project_path(project_dir);
     std::filesystem::path toml_path = project_path / "project.toml";
     
@@ -48,17 +48,17 @@ std::string read_release_config(const std::string& project_dir, forma::tracer::T
     // Parse TOML
     auto doc = forma::toml::parse(toml_content);
     
-    // Get [release] table
-    auto* release_table = doc.get_table("release");
-    if (!release_table) {
-        tracer.error("No [release] section found in project configuration");
+    // Get [deploy] table
+    auto* deploy_table = doc.get_table("deploy");
+    if (!deploy_table) {
+        tracer.error("No [deploy] section found in project configuration");
         return "";
     }
     
     // Get system value
-    auto system = release_table->get_string("system");
+    auto system = deploy_table->get_string("system");
     if (!system) {
-        tracer.error("No 'system' key found in [release] section");
+        tracer.error("No 'system' key found in [deploy] section");
         return "";
     }
     
@@ -66,14 +66,14 @@ std::string read_release_config(const std::string& project_dir, forma::tracer::T
 }
 
 // Call the debian package builder plugin
-int call_deb_release_plugin(const std::string& project_dir, forma::tracer::TracerPlugin& tracer) {
+int call_deb_deploy_plugin(const std::string& project_dir, forma::tracer::TracerPlugin& tracer) {
     // Try multiple possible plugin locations
     std::vector<std::filesystem::path> plugin_paths = {
-        std::filesystem::path(project_dir) / "build" / "plugins" / "forma-deb-release.so",
-        "../plugins/deb-release/build/forma-deb-release.so",  // Relative to test dir
-        "plugins/deb-release/build/forma-deb-release.so",     // From forma root
-        std::filesystem::path("build") / "plugins" / "forma-deb-release.so",
-        "/usr/local/lib/forma/plugins/forma-deb-release.so"
+        std::filesystem::path(project_dir) / "build" / "plugins" / "forma-deb-deploy.so",
+        "../plugins/deb-deploy/build/forma-deb-deploy.so",  // Relative to test dir
+        "plugins/deb-deploy/build/forma-deb-deploy.so",     // From forma root
+        std::filesystem::path("build") / "plugins" / "forma-deb-deploy.so",
+        "/usr/local/lib/forma/plugins/forma-deb-deploy.so"
     };
     
     std::filesystem::path plugin_path;
@@ -90,7 +90,7 @@ int call_deb_release_plugin(const std::string& project_dir, forma::tracer::Trace
     }
     
     if (!found) {
-        tracer.error("deb-release plugin not found. Build it first with:");
+        tracer.error("deb-deploy plugin not found. Build it first with:");
         tracer.info("  cd plugins/deb-release && cmake -B build && cmake --build build");
         tracer.info("Or install it system-wide.");
         tracer.info("Searched paths:");
@@ -100,7 +100,7 @@ int call_deb_release_plugin(const std::string& project_dir, forma::tracer::Trace
         return 1;
     }
     
-    tracer.verbose(std::string("Loading deb-release plugin: ") + plugin_path.string());
+    tracer.verbose(std::string("Loading deb-deploy plugin: ") + plugin_path.string());
     
     // Load the plugin dynamically
     void* handle = dlopen(plugin_path.c_str(), RTLD_LAZY);
@@ -158,35 +158,35 @@ int call_deb_release_plugin(const std::string& project_dir, forma::tracer::Trace
     }
 }
 
-int run_release_command(const ReleaseOptions& opts) {
+int run_deploy_command(const DeployOptions& opts) {
     auto& tracer = forma::tracer::get_tracer();
     
     if (opts.verbose) {
         tracer.set_level(forma::tracer::TraceLevel::Verbose);
     }
     
-    tracer.info("Forma Release Command");
-    tracer.info("=====================\n");
+    tracer.info("Forma Deploy Command");
+    tracer.info("===================\n");
     
     std::string project_dir = opts.project_dir.empty() ? "." : opts.project_dir;
-    std::string release_system = opts.release_system;
+    std::string deploy_system = opts.deploy_system;
     
-    // If no release system specified on command line, read from project.toml
-    if (release_system.empty()) {
-        release_system = read_release_config(project_dir, tracer);
-        if (release_system.empty()) {
+    // If no deploy system specified on command line, read from project.toml
+    if (deploy_system.empty()) {
+        deploy_system = read_deploy_config(project_dir, tracer);
+        if (deploy_system.empty()) {
             return 1;
         }
-        tracer.info(std::string("Release system: ") + release_system + " (from project.toml)");
+        tracer.info(std::string("Deploy system: ") + deploy_system + " (from project.toml)");
     } else {
-        tracer.info(std::string("Release system: ") + release_system + " (from --release-system)");
+        tracer.info(std::string("Deploy system: ") + deploy_system + " (from --deploy-system)");
     }
     
     // Currently only deb is supported
-    if (release_system == "deb" || release_system == "debian") {
-        return call_deb_release_plugin(project_dir, tracer);
+    if (deploy_system == "deb" || deploy_system == "debian") {
+        return call_deb_deploy_plugin(project_dir, tracer);
     } else {
-        tracer.error(std::string("Unsupported release system: ") + release_system);
+        tracer.error(std::string("Unsupported deploy system: ") + deploy_system);
         tracer.info("Supported systems: deb, debian");
         return 1;
     }

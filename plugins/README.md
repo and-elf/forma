@@ -9,7 +9,7 @@ plugins/
 ├── lvgl-renderer/      # LVGL C99 code generator
 ├── lsp-server/         # Language Server Protocol implementation  
 ├── cmake-generator/    # CMake build file generator
-├── deb-release/        # Debian package generator
+├── deb-deploy/        # Debian package generator
 ├── esp32-lvgl/         # ESP32 + LVGL build system
 ├── tracer/             # Logging and diagnostics plugin
 ├── http-client/        # HTTP/HTTPS download utility (libcurl)
@@ -22,7 +22,7 @@ plugins/
 ### Code Generators
 - **lvgl-renderer** - Generate C99 code for LVGL UI framework
 - **cmake-generator** - Generate CMakeLists.txt build files
-- **deb-release** - Generate Debian .deb packages
+- **deb-deploy** - Generate Debian .deb packages
 
 ### Development Tools
 - **lsp-server** - IDE integration via Language Server Protocol
