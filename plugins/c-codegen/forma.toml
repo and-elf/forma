@@ -1,0 +1,7 @@
+[plugin]
+name = "c-codegen"
+version = "0.1.0"
+description = "Generic C code generator for Forma classes and types"
+
+[deploy]
+system = "deb"

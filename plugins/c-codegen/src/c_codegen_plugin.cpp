@@ -1,0 +1,80 @@
+#include "c_codegen.hpp"
+#include <plugin_hash.hpp>
+#include <cstdint>
+#include <iostream>
+#include <fstream>
+#include <cstring>
+
+// Plugin metadata hash - computed from forma.toml at compile time
+constexpr std::string_view PLUGIN_TOML_CONTENT = R"(# C Code Generator Plugin Configuration
+
+[plugin]
+name = "c-codegen"
+kind = "codegen"
+api_version = "1.0.0"
+runtime = "native"
+
+[capabilities]
+provides = [
+    "codegen:c",
+    "classes:c-structs"
+]
+
+requires = []
+
+[codegen]
+output_extension = ".h"
+output_language = "c"
+)";
+
+constexpr uint64_t METADATA_HASH = forma::fnv1a_hash(PLUGIN_TOML_CONTENT);
+
+// Plugin exports
+extern "C" {
+
+// Plugin metadata hash (required)
+uint64_t forma_plugin_metadata_hash() {
+    return METADATA_HASH;
+}
+
+// Render function (required)
+bool forma_render(const void* doc_ptr, const char* input_path, const char* output_path) {
+    (void)input_path; // Unused
+    
+    if (!doc_ptr || !output_path) {
+        std::cerr << "[C Codegen] Error: null pointer passed to render\n";
+        return false;
+    }
+    
+    try {
+        // Cast the document pointer
+        const auto* doc = static_cast<const forma::Document<32,16,16,32,64,64>*>(doc_ptr);
+        
+        // Create generator
+        forma::codegen::CCodeGenerator<65536> generator;
+        
+        // Generate code
+        generator.generate(*doc);
+        
+        // Write output file
+        std::ofstream out(output_path);
+        if (!out) {
+            std::cerr << "[C Codegen] Error: cannot write to " << output_path << "\n";
+            return false;
+        }
+        
+        out << generator.get_output();
+        out.close();
+        
+        std::cout << "[C Codegen] Generated " << generator.get_output().size() 
+                  << " bytes to " << output_path << "\n";
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "[C Codegen] Exception: " << e.what() << "\n";
+        return false;
+    }
+}
+
+} // extern "C"
