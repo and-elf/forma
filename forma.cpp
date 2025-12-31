@@ -30,7 +30,8 @@ struct CompilerOptions {
     std::string project_name;
     std::string plugin_type;  // Plugin type for init plugin
     std::string input_file;
-    std::string deploy_system;
+    std::vector<std::string> deploy_systems;
+    std::vector<std::string> architectures;
     bool verbose = false;
     bool debug = false;
     bool list_plugins = false;
@@ -376,7 +377,8 @@ int main(int argc, char* argv[]) {
 
     // Deploy command
     auto* deploy_cmd = app.add_subcommand("deploy", "Build and package project for deployment");
-    deploy_cmd->add_option("--deploy-system", opts.deploy_system, "Deploy packaging system: deb, rpm, etc.");
+    deploy_cmd->add_option("--deploy-system", opts.deploy_systems, "Deploy packaging system: deb, rpm, etc.")->expected(1, -1);
+    deploy_cmd->add_option("--arch", opts.architectures, "Target architectures: amd64, arm64, armhf, etc.")->expected(1, -1);
     deploy_cmd->add_option("--project", opts.project_path, "Project directory");
     deploy_cmd->callback([&opts]() { opts.mode = "deploy"; });
 
@@ -433,7 +435,8 @@ int main(int argc, char* argv[]) {
     if (opts.mode == "deploy") {
         forma::commands::DeployOptions deploy_opts;
         deploy_opts.project_dir = opts.project_path.empty() ? "." : opts.project_path;
-        deploy_opts.deploy_system = opts.deploy_system;
+        deploy_opts.deploy_systems = opts.deploy_systems;
+        deploy_opts.architectures = opts.architectures;
         deploy_opts.verbose = opts.verbose;
 
         return forma::commands::run_deploy_command(deploy_opts);

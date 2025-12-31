@@ -13,7 +13,8 @@ namespace forma::commands {
 
 struct DeployOptions {
     std::string project_dir;
-    std::string deploy_system;  // Override from command line
+    std::vector<std::string> deploy_systems;  // Multiple deployment systems
+    std::vector<std::string> architectures;   // Target architectures
     bool verbose = false;
 };
 
@@ -169,27 +170,82 @@ int run_deploy_command(const DeployOptions& opts) {
     tracer.info("===================\n");
     
     std::string project_dir = opts.project_dir.empty() ? "." : opts.project_dir;
-    std::string deploy_system = opts.deploy_system;
     
-    // If no deploy system specified on command line, read from project.toml
-    if (deploy_system.empty()) {
-        deploy_system = read_deploy_config(project_dir, tracer);
-        if (deploy_system.empty()) {
+    // Determine deploy systems to use
+    std::vector<std::string> deploy_systems = opts.deploy_systems;
+    
+    // If no deploy systems specified on command line, read from project.toml
+    if (deploy_systems.empty()) {
+        std::string config_system = read_deploy_config(project_dir, tracer);
+        if (config_system.empty()) {
             return 1;
         }
-        tracer.info(std::string("Deploy system: ") + deploy_system + " (from project.toml)");
+        deploy_systems.push_back(config_system);
+        tracer.info(std::string("Deploy system: ") + config_system + " (from project.toml)");
     } else {
-        tracer.info(std::string("Deploy system: ") + deploy_system + " (from --deploy-system)");
+        tracer.info(std::string("Deploy systems: ") + std::to_string(deploy_systems.size()) + " specified");
+        if (opts.verbose) {
+            for (const auto& sys : deploy_systems) {
+                tracer.verbose(std::string("  - ") + sys);
+            }
+        }
     }
     
-    // Currently only deb is supported
-    if (deploy_system == "deb" || deploy_system == "debian") {
-        return call_deb_deploy_plugin(project_dir, tracer);
+    // Determine architectures
+    std::vector<std::string> architectures = opts.architectures;
+    if (architectures.empty()) {
+        // Default to current system architecture
+        architectures.push_back("amd64");  // TODO: Detect from system
+        tracer.verbose("Using default architecture: amd64");
     } else {
-        tracer.error(std::string("Unsupported deploy system: ") + deploy_system);
-        tracer.info("Supported systems: deb, debian");
+        tracer.info(std::string("Architectures: ") + std::to_string(architectures.size()) + " specified");
+        if (opts.verbose) {
+            for (const auto& arch : architectures) {
+                tracer.verbose(std::string("  - ") + arch);
+            }
+        }
+    }
+    
+    // Build all combinations
+    int total_builds = deploy_systems.size() * architectures.size();
+    int successful = 0;
+    int failed = 0;
+    
+    tracer.info(std::string("\nBuilding ") + std::to_string(total_builds) + " package(s)...\n");
+    
+    for (const auto& deploy_system : deploy_systems) {
+        for (const auto& arch : architectures) {
+            tracer.info(std::string("Building: ") + deploy_system + " (" + arch + ")");
+            
+            // Currently only deb is supported
+            if (deploy_system == "deb" || deploy_system == "debian") {
+                int result = call_deb_deploy_plugin(project_dir, tracer);
+                if (result == 0) {
+                    successful++;
+                } else {
+                    failed++;
+                    tracer.error(std::string("Failed to build: ") + deploy_system + " (" + arch + ")");
+                }
+            } else {
+                tracer.error(std::string("Unsupported deploy system: ") + deploy_system);
+                tracer.info("Supported systems: deb, debian");
+                failed++;
+            }
+        }
+    }
+    
+    // Summary
+    tracer.info(std::string("\n==================="));
+    tracer.info(std::string("Deployment Summary"));
+    tracer.info(std::string("==================="));
+    tracer.info(std::string("Total: ") + std::to_string(total_builds));
+    tracer.info(std::string("✓ Successful: ") + std::to_string(successful));
+    if (failed > 0) {
+        tracer.error(std::string("✗ Failed: ") + std::to_string(failed));
         return 1;
     }
+    
+    return 0;
 }
 
 } // namespace forma::commands
