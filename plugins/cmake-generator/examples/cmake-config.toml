@@ -1,0 +1,34 @@
+# CMake Generator Configuration Example
+# This can be embedded in your project.toml or forma.toml
+
+[cmake]
+# Project name
+project_name = "MyFormaApp"
+
+# Minimum CMake version required
+cmake_minimum_version = "3.20"
+
+# C++ standard (17, 20, 23)
+cxx_standard = "20"
+
+# CMake generator (Ninja, "Unix Makefiles", etc.)
+generator = "Ninja"
+
+# Build type (Debug, Release, RelWithDebInfo, MinSizeRel)
+build_type = "Release"
+
+# Output directory for generated files
+output_dir = "build"
+
+# Target executable name
+target_name = "app"
+
+# Optional: Cross-compilation target triple
+# target_triple = "aarch64-linux-gnu"
+
+# Note: Arrays not yet supported in Forma TOML parser
+# Will be added in future version:
+# source_files = ["src/main.cpp", "src/app.cpp"]
+# include_dirs = ["include", "external/include"]
+# link_libraries = ["pthread", "m"]
+# compile_options = ["-Wall", "-Wextra"]

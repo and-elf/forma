@@ -3,6 +3,7 @@
 #include <string>
 #include <filesystem>
 #include <optional>
+#include <fstream>
 #include <toml/toml.hpp>
 
 namespace forma::config {

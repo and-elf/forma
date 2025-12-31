@@ -1,0 +1,21 @@
+# ESP32 LVGL Configuration Example
+# This can be embedded in your project.toml or forma.toml
+
+[esp32]
+# ESP-IDF version to use
+idf_version = "v5.1"
+
+# Target ESP32 chip (esp32, esp32s2, esp32s3, esp32c3, esp32c6)
+target = "esp32"
+
+# Optional: Specify custom IDF path
+# idf_path = "/opt/esp/esp-idf"
+
+# Optional: Specify custom toolchain path
+# toolchain_path = "/opt/esp/xtensa-esp32-elf"
+
+# Automatically install ESP-IDF if not found
+auto_install = true
+
+# Automatically download toolchain if not found
+download_toolchain = true

@@ -1,5 +1,6 @@
 #pragma once
 #include "plugin.hpp"
+#include <toml/toml.hpp>
 #include <string>
 #include <vector>
 #include <fstream>
@@ -19,6 +20,21 @@ struct CMakeGeneratorConfig {
     std::string output_dir;
     std::string target_name;
     std::string target_triple; // Target architecture/platform (e.g., "aarch64-linux-gnu")
+    
+    // Load config from TOML table
+    void load_from_toml(const forma::toml::Table<32>& table) {
+        if (auto val = table.get_string("project_name")) project_name = std::string(*val);
+        if (auto val = table.get_string("cmake_minimum_version")) cmake_minimum_version = std::string(*val);
+        if (auto val = table.get_string("cxx_standard")) cxx_standard = std::string(*val);
+        if (auto val = table.get_string("generator")) generator = std::string(*val);
+        if (auto val = table.get_string("build_type")) build_type = std::string(*val);
+        if (auto val = table.get_string("output_dir")) output_dir = std::string(*val);
+        if (auto val = table.get_string("target_name")) target_name = std::string(*val);
+        if (auto val = table.get_string("target_triple")) target_triple = std::string(*val);
+        
+        // TODO: Support arrays when TOML parser adds array iteration
+        // source_files, include_dirs, link_libraries, compile_options
+    }
 };
 
 class CMakeGenerator {

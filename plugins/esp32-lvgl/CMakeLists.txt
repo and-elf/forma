@@ -23,6 +23,7 @@ set_target_properties(forma_esp32_lvgl PROPERTIES
 
 target_include_directories(forma_esp32_lvgl PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../src>
     $<INSTALL_INTERFACE:include/forma/plugins/esp32-lvgl>
 )
 

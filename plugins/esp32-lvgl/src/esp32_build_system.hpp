@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core/config.hpp>
+#include <toml/toml.hpp>
 #include <string>
 #include <vector>
 #include <fstream>
@@ -19,6 +20,16 @@ struct ESP32Config {
     std::string toolchain_path;
     bool auto_install = true;
     bool download_toolchain = true;
+    
+    // Load config from TOML table
+    void load_from_toml(const toml::Table<32>& table) {
+        if (auto val = table.get_string("idf_version")) idf_version = std::string(*val);
+        if (auto val = table.get_string("target")) target = std::string(*val);
+        if (auto val = table.get_string("idf_path")) idf_path = std::string(*val);
+        if (auto val = table.get_string("toolchain_path")) toolchain_path = std::string(*val);
+        if (auto val = table.get_bool("auto_install")) auto_install = *val;
+        if (auto val = table.get_bool("download_toolchain")) download_toolchain = *val;
+    }
 };
 
 class ESP32BuildSystem {
@@ -244,55 +255,18 @@ private:
     }
 };
 
-// Helper to parse ESP32 configuration from TOML
+// Load ESP32 configuration from TOML file using Forma's TOML parser
 inline bool parse_esp32_config(const std::string& toml_content, ESP32Config& config) {
-    // Simple TOML parser for [esp32] section
-    std::istringstream stream(toml_content);
-    std::string line;
-    bool in_esp32_section = false;
+    // Parse TOML using Forma's standard parser
+    auto doc = toml::parse<16>(toml_content);
     
-    while (std::getline(stream, line)) {
-        // Trim whitespace
-        size_t start = line.find_first_not_of(" \t\r\n");
-        if (start == std::string::npos || line[start] == '#') continue;
-        
-        // Check for [esp32] section
-        if (line.find("[esp32]") != std::string::npos) {
-            in_esp32_section = true;
-            continue;
-        }
-        
-        // Exit section on new section
-        if (line[0] == '[') {
-            in_esp32_section = false;
-            continue;
-        }
-        
-        if (!in_esp32_section) continue;
-        
-        // Parse key = value
-        size_t eq_pos = line.find('=');
-        if (eq_pos == std::string::npos) continue;
-        
-        std::string key = line.substr(0, eq_pos);
-        std::string value = line.substr(eq_pos + 1);
-        
-        // Trim
-        key.erase(key.find_last_not_of(" \t") + 1);
-        size_t vstart = value.find_first_not_of(" \t\\\"");
-        if (vstart != std::string::npos) {
-            value = value.substr(vstart);
-        }
-        if (!value.empty() && value.back() == '"') value.pop_back();
-        
-        if (key == "idf_version") config.idf_version = value;
-        else if (key == "target") config.target = value;
-        else if (key == "idf_path") config.idf_path = value;
-        else if (key == "auto_install") config.auto_install = (value == "true");
-        else if (key == "download_toolchain") config.download_toolchain = (value == "true");
+    // Try [esp32] table
+    if (auto table = doc.get_table("esp32")) {
+        config.load_from_toml(*table);
+        return true;
     }
     
-    return true;
+    return false;
 }
 
 } // namespace forma::esp32
