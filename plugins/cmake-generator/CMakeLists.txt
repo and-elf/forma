@@ -32,13 +32,27 @@ target_include_directories(forma_cmake_generator PRIVATE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../src>
 )
 
-# Link with download support if available
-if(TARGET forma_download)
-    target_link_libraries(forma_cmake_generator PRIVATE forma_download)
-    target_compile_definitions(forma_cmake_generator PRIVATE FORMA_HAS_DOWNLOAD)
-    message(STATUS "CMake generator: Download support enabled")
+# Link with http-client and archive-utils plugins if needed for download support
+option(CMAKE_GENERATOR_ENABLE_DOWNLOADS "Enable CMake auto-download support" OFF)
+
+if(CMAKE_GENERATOR_ENABLE_DOWNLOADS)
+    # Try to find the utility plugins
+    find_package(FormaHTTPClient QUIET)
+    find_package(FormaArchiveUtils QUIET)
+    
+    if(FormaHTTPClient_FOUND AND FormaArchiveUtils_FOUND)
+        target_link_libraries(forma_cmake_generator PRIVATE 
+            FormaPlugins::forma_http_client
+            FormaPlugins::forma_archive_utils
+        )
+        target_compile_definitions(forma_cmake_generator PRIVATE FORMA_HAS_DOWNLOAD)
+        message(STATUS "CMake generator: Download support enabled")
+    else()
+        message(STATUS "CMake generator: Download support requested but utility plugins not found")
+        message(STATUS "  Build and install http-client and archive-utils plugins first")
+    endif()
 else()
-    message(STATUS "CMake generator: Download support disabled (build with -DFORMA_ENABLE_DOWNLOADS=ON to enable)")
+    message(STATUS "CMake generator: Download support disabled")
 endif()
 
 target_include_directories(forma_cmake_generator PUBLIC

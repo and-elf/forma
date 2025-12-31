@@ -6,7 +6,8 @@
 #include <filesystem>
 
 #ifdef FORMA_HAS_DOWNLOAD
-#include <core/download.hpp>
+#include <http-client/download.hpp>
+#include <archive-utils/archive.hpp>
 #endif
 
 namespace forma::cmake {
