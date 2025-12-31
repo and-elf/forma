@@ -2,36 +2,13 @@
 // Makes the LVGL renderer available as a dynamic plugin
 
 #include "lvgl_renderer.hpp"
-#include <plugin_hash.hpp>
+#include <plugin_utils.hpp>
 #include <cstdint>
 #include <iostream>
 #include <fstream>
-#include <sstream>
-#include <cstring>
 
-// Plugin metadata - read from forma.toml to ensure single source of truth
-// Path is relative to the plugin source directory
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-
-#ifndef FORMA_TOML_PATH
-#define FORMA_TOML_PATH ../forma.toml
-#endif
-
-static std::string read_toml_file() {
-    const char* toml_path = TOSTRING(FORMA_TOML_PATH);
-    std::ifstream file(toml_path);
-    if (!file) {
-        std::cerr << "[LVGL Renderer] Warning: Could not read " << toml_path << "\n";
-        return "";
-    }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
-}
-
-static const std::string PLUGIN_TOML_CONTENT = read_toml_file();
-static const uint64_t METADATA_HASH = forma::fnv1a_hash(PLUGIN_TOML_CONTENT);
+// Plugin metadata - computed from forma.toml (single source of truth)
+static const uint64_t METADATA_HASH = FORMA_PLUGIN_TOML_HASH("LVGL Renderer", ../forma.toml);
 
 // Plugin exports
 extern "C" {
