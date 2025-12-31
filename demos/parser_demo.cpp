@@ -13,6 +13,7 @@ void print_value(const Value& val) {
         case Value::Kind::String: std::cout << "string"; break;
         case Value::Kind::Bool: std::cout << "bool"; break;
         case Value::Kind::Identifier: std::cout << "id"; break;
+        case Value::Kind::URI: std::cout << "uri"; break;
     }
     std::cout << ")";
 }
@@ -41,7 +42,7 @@ void print_instance(const InstanceDecl& inst, const InstanceNode& storage, int i
     
     // Print children
     for (size_t i = 0; i < inst.child_count; ++i) {
-        const auto& child = storage.get(inst.child_start_idx + i);
+        const auto& child = storage.get(inst.child_indices[i]);
         print_instance(child, storage, indent + 1);
     }
     

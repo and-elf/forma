@@ -1,0 +1,9 @@
+// Counter class example
+
+class Counter {
+    value: int = 0
+}
+
+Button {
+    text: "Click Me"
+}

@@ -606,12 +606,113 @@ private:
             }
         }
         
-        if (has_classes) {
-            append_line("/* Class Instances (Public API) */");
-            // TODO: Track actual class instances, not just type definitions
-            // For now, this is a placeholder for class instance generation
-            append_line();
+        if (!has_classes) return;
+        
+        append_line("/* ============================================================================");
+        append_line(" * Class Definitions (Public API)");
+        append_line(" * ============================================================================ */");
+        append_line();
+        
+        // Generate struct definitions for each class
+        for (size_t i = 0; i < document.type_count; ++i) {
+            const auto& type = document.types[i];
+            if (type.method_count == 0) continue;  // Not a class
+            
+            // Generate typedef struct
+            append("typedef struct {\n");
+            indent_level++;
+            
+            // Generate properties
+            for (size_t j = 0; j < type.prop_count; ++j) {
+                const auto& prop = type.properties[j];
+                for (size_t k = 0; k < indent_level; ++k) append("    ");
+                append(map_type_to_c(prop.type));
+                append(" ");
+                append(prop.name);
+                append(";\n");
+            }
+            
+            indent_level--;
+            append("} ");
+            append(type.name);
+            append(";\n\n");
         }
+        
+        // Generate global instances
+        append_line("/* Class Instances (Global) */");
+        for (size_t i = 0; i < document.type_count; ++i) {
+            const auto& type = document.types[i];
+            if (type.method_count == 0) continue;
+            
+            append(type.name);
+            append(" ");
+            // Convert type name to lowercase for instance name
+            for (size_t j = 0; j < type.name.size() && output_pos < MaxOutput - 1; ++j) {
+                char c = type.name[j];
+                if (c >= 'A' && c <= 'Z') {
+                    output_buffer[output_pos++] = c + ('a' - 'A');
+                } else {
+                    output_buffer[output_pos++] = c;
+                }
+            }
+            append(" = {");
+            
+            // Initialize properties with default values
+            bool first = true;
+            for (size_t j = 0; j < type.prop_count; ++j) {
+                if (!first) append(", ");
+                first = false;
+                
+                append(".");
+                append(type.properties[j].name);
+                append(" = ");
+                
+                // Default initialization based on type
+                if (type.properties[j].type.name == "int" || 
+                    type.properties[j].type.name == "i32") {
+                    append("0");
+                } else if (type.properties[j].type.name == "bool") {
+                    append("false");
+                } else if (type.properties[j].type.name == "string") {
+                    append("NULL");
+                } else {
+                    append("0");
+                }
+            }
+            
+            append("};\n");
+        }
+        append_line();
+    }
+    
+    constexpr const char* map_type_to_c(const TypeRef& type) const {
+        if (type.name == "int" || type.name == "i32") return "int32_t";
+        if (type.name == "i64") return "int64_t";
+        if (type.name == "i16") return "int16_t";
+        if (type.name == "i8") return "int8_t";
+        if (type.name == "u32") return "uint32_t";
+        if (type.name == "u64") return "uint64_t";
+        if (type.name == "u16") return "uint16_t";
+        if (type.name == "u8") return "uint8_t";
+        if (type.name == "f32" || type.name == "float") return "float";
+        if (type.name == "f64" || type.name == "double") return "double";
+        if (type.name == "bool") return "bool";
+        if (type.name == "string") return "const char*";
+        if (type.name == "void") return "void";
+        
+        // Unknown type, use as-is (might be a custom type)
+        static char buffer[64];
+        size_t len = type.name.size() < 63 ? type.name.size() : 63;
+        for (size_t i = 0; i < len; ++i) {
+            buffer[i] = type.name[i];
+        }
+        buffer[len] = '\0';
+        return buffer;
+    }
+    
+    constexpr void generate_class_methods([[maybe_unused]] const auto& document) {
+        // Method declarations are generated in generate_class_instances()
+        // Users must implement the methods in their own code
     }
 
 public:
@@ -689,6 +790,9 @@ public:
         
         // Generate class instances (public API)
         generate_class_instances(document);
+        
+        // Generate class method implementations
+        generate_class_methods(document);
         
         // Generate UI widget variables (internal/private)
         if (document.instances.count > 0) {
