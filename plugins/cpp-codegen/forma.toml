@@ -1,0 +1,7 @@
+[plugin]
+name = "cpp-codegen"
+version = "0.1.0"
+description = "Modern C++ code generator for Forma classes and types"
+
+[deploy]
+system = "deb"
