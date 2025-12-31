@@ -18,8 +18,14 @@ struct DeployOptions {
     bool verbose = false;
 };
 
-// Read project.toml and extract deployment configuration
-std::string read_deploy_config(const std::string& project_dir, forma::tracer::TracerPlugin& tracer) {
+struct ProjectInfo {
+    std::string deploy_system;
+    bool is_plugin = false;
+    std::string plugin_name;
+};
+
+// Read project.toml/forma.toml/plugin.toml and extract deployment configuration
+ProjectInfo read_deploy_config(const std::string& project_dir, forma::tracer::TracerPlugin& tracer) {
     std::filesystem::path project_path(project_dir);
     std::filesystem::path toml_path = project_path / "project.toml";
     
@@ -28,9 +34,14 @@ std::string read_deploy_config(const std::string& project_dir, forma::tracer::Tr
         toml_path = project_path / "forma.toml";
     }
     
+    // Try plugin.toml if forma.toml doesn't exist
     if (!std::filesystem::exists(toml_path)) {
-        tracer.error("No project.toml or forma.toml found in project directory");
-        return "";
+        toml_path = project_path / "plugin.toml";
+    }
+    
+    if (!std::filesystem::exists(toml_path)) {
+        tracer.error("No project.toml, forma.toml, or plugin.toml found in project directory");
+        return {};
     }
     
     tracer.verbose(std::string("Reading project configuration: ") + toml_path.string());
@@ -39,7 +50,7 @@ std::string read_deploy_config(const std::string& project_dir, forma::tracer::Tr
     std::ifstream file(toml_path);
     if (!file.is_open()) {
         tracer.error(std::string("Failed to open: ") + toml_path.string());
-        return "";
+        return {};
     }
     
     std::stringstream buffer;
@@ -49,21 +60,36 @@ std::string read_deploy_config(const std::string& project_dir, forma::tracer::Tr
     // Parse TOML
     auto doc = forma::toml::parse(toml_content);
     
+    ProjectInfo info;
+    
+    // Check if this is a plugin
+    auto* plugin_table = doc.get_table("plugin");
+    if (plugin_table) {
+        info.is_plugin = true;
+        auto name = plugin_table->get_string("name");
+        if (name) {
+            info.plugin_name = std::string(name.value());
+            tracer.verbose(std::string("Detected plugin: ") + info.plugin_name);
+        }
+    }
+    
     // Get [deploy] table
     auto* deploy_table = doc.get_table("deploy");
     if (!deploy_table) {
-        tracer.error("No [deploy] section found in project configuration");
-        return "";
+        tracer.error("No [deploy] section found in configuration");
+        tracer.info("Add a [deploy] section with: system = \"deb\" (or rpm, etc.)");
+        return {};
     }
     
     // Get system value
     auto system = deploy_table->get_string("system");
     if (!system) {
         tracer.error("No 'system' key found in [deploy] section");
-        return "";
+        return {};
     }
     
-    return std::string(system.value());
+    info.deploy_system = std::string(system.value());
+    return info;
 }
 
 // Call the debian package builder plugin
@@ -71,6 +97,8 @@ int call_deb_deploy_plugin(const std::string& project_dir, forma::tracer::Tracer
     // Try multiple possible plugin locations
     std::vector<std::filesystem::path> plugin_paths = {
         std::filesystem::path(project_dir) / "build" / "plugins" / "forma-deb-deploy.so",
+        "../deb-deploy/build/forma-deb-deploy.so",          // From sibling plugin dir
+        "../../plugins/deb-deploy/build/forma-deb-deploy.so", // From plugin subdir
         "../plugins/deb-deploy/build/forma-deb-deploy.so",  // Relative to test dir
         "plugins/deb-deploy/build/forma-deb-deploy.so",     // From forma root
         std::filesystem::path("build") / "plugins" / "forma-deb-deploy.so",
@@ -173,16 +201,32 @@ int run_deploy_command(const DeployOptions& opts) {
     
     // Determine deploy systems to use
     std::vector<std::string> deploy_systems = opts.deploy_systems;
+    bool is_plugin = false;
+    std::string plugin_name;
     
-    // If no deploy systems specified on command line, read from project.toml
+    // If no deploy systems specified on command line, read from config
     if (deploy_systems.empty()) {
-        std::string config_system = read_deploy_config(project_dir, tracer);
-        if (config_system.empty()) {
+        auto info = read_deploy_config(project_dir, tracer);
+        if (info.deploy_system.empty()) {
             return 1;
         }
-        deploy_systems.push_back(config_system);
-        tracer.info(std::string("Deploy system: ") + config_system + " (from project.toml)");
+        deploy_systems.push_back(info.deploy_system);
+        is_plugin = info.is_plugin;
+        plugin_name = info.plugin_name;
+        
+        if (is_plugin) {
+            tracer.info(std::string("Plugin: ") + plugin_name);
+        }
+        tracer.info(std::string("Deploy system: ") + info.deploy_system + " (from config)");
     } else {
+        // Check if it's a plugin even when deploy systems are specified
+        auto info = read_deploy_config(project_dir, tracer);
+        is_plugin = info.is_plugin;
+        plugin_name = info.plugin_name;
+        
+        if (is_plugin) {
+            tracer.info(std::string("Plugin: ") + plugin_name);
+        }
         tracer.info(std::string("Deploy systems: ") + std::to_string(deploy_systems.size()) + " specified");
         if (opts.verbose) {
             for (const auto& sys : deploy_systems) {

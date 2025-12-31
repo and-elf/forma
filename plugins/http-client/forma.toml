@@ -1,0 +1,9 @@
+# HTTP Client Plugin Configuration
+
+[plugin]
+name = "http-client"
+kind = "utility"
+api_version = "1.0.0"
+
+[deploy]
+system = "deb"

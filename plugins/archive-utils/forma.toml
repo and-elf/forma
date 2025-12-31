@@ -1,0 +1,9 @@
+# Archive Utils Plugin Configuration
+
+[plugin]
+name = "archive-utils"
+kind = "utility"
+api_version = "1.0.0"
+
+[deploy]
+system = "deb"

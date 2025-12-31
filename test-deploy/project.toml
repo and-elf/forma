@@ -6,6 +6,6 @@ version = "1.0.0"
 renderer = "lvgl"
 build_system = "cmake"
 
-[release]
-# Release packaging system: deb, rpm, etc.
+[deploy]
+# Deploy packaging system: deb, rpm, etc.
 system = "deb"
