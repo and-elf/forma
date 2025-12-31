@@ -3,31 +3,32 @@
 #include <cstdint>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <cstring>
 
-// Plugin metadata hash - computed from forma.toml at compile time
-constexpr std::string_view PLUGIN_TOML_CONTENT = R"(# C Code Generator Plugin Configuration
+// Plugin metadata - read from forma.toml to ensure single source of truth
+// Path is relative to the plugin source directory
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
 
-[plugin]
-name = "c-codegen"
-kind = "codegen"
-api_version = "1.0.0"
-runtime = "native"
+#ifndef FORMA_TOML_PATH
+#define FORMA_TOML_PATH ../forma.toml
+#endif
 
-[capabilities]
-provides = [
-    "codegen:c",
-    "classes:c-structs"
-]
+static std::string read_toml_file() {
+    const char* toml_path = TOSTRING(FORMA_TOML_PATH);
+    std::ifstream file(toml_path);
+    if (!file) {
+        std::cerr << "[C Codegen] Warning: Could not read " << toml_path << "\n";
+        return "";
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
 
-requires = []
-
-[codegen]
-output_extension = ".h"
-output_language = "c"
-)";
-
-constexpr uint64_t METADATA_HASH = forma::fnv1a_hash(PLUGIN_TOML_CONTENT);
+static const std::string PLUGIN_TOML_CONTENT = read_toml_file();
+static const uint64_t METADATA_HASH = forma::fnv1a_hash(PLUGIN_TOML_CONTENT);
 
 // Plugin exports
 extern "C" {
