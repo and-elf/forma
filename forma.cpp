@@ -11,6 +11,7 @@
 #include "src/commands/run.hpp"
 #include "plugins/tracer/src/tracer_plugin.hpp"
 #include "plugins/lvgl-renderer/src/lvgl_renderer_builtin.hpp"
+#include "src/toml/toml.hpp"
 #include <CLI/CLI.hpp>
 #include <iostream>
 #include <fstream>
@@ -202,8 +203,28 @@ int generate_code(const DocType& doc, const std::string& input_file,
 }
 
 int main(int argc, char* argv[]) {
-    CLI::App app{"Forma Programming Language v0.1.0"};
-    app.set_version_flag("--version", "0.1.0");
+    // Determine project/application version from forma.toml if present
+    std::string app_version = "0.1.0";
+    try {
+        std::filesystem::path config_path = std::filesystem::current_path() / "forma.toml";
+        if (std::filesystem::exists(config_path)) {
+            std::ifstream config_file(config_path);
+            std::string config_content((std::istreambuf_iterator<char>(config_file)), std::istreambuf_iterator<char>());
+            auto toml_doc = forma::toml::parse(config_content);
+            if (auto pkg = toml_doc.get_table("package")) {
+                if (auto ver = pkg->get_string("version")) {
+                    app_version = std::string(*ver);
+                }
+            } else if (auto ver = toml_doc.root.get_string("version")) {
+                app_version = std::string(*ver);
+            }
+        }
+    } catch (...) {
+        // Fall back to default version on any parse/IO error
+    }
+
+    CLI::App app{"Forma Programming Language"};
+    app.set_version_flag("--version", app_version.c_str());
     app.footer("A QML-inspired programming language");
 
     CompilerOptions opts;

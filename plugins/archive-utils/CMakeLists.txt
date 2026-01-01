@@ -51,68 +51,75 @@ CPMAddPackage(
 # Archive Utils Library
 # ============================================================================
 
-add_library(forma_archive_utils STATIC
-    src/archive.cpp
-)
+if(NOT TARGET forma_archive_utils)
+    add_library(forma_archive_utils STATIC
+        src/archive.cpp
+    )
 
-target_link_libraries(forma_archive_utils
-    PRIVATE
-        archive_static
-)
+    target_link_libraries(forma_archive_utils
+        PRIVATE
+            archive_static
+    )
 
-target_include_directories(forma_archive_utils PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include/forma/archive-utils>
-)
+    target_include_directories(forma_archive_utils PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+        $<INSTALL_INTERFACE:include/forma/archive-utils>
+    )
 
-# Add libarchive include directories
-target_include_directories(forma_archive_utils PRIVATE
-    ${CMAKE_BINARY_DIR}/_deps/libarchive-src/libarchive
-    ${CMAKE_BINARY_DIR}/_deps/libarchive-build
-)
+    # Add libarchive include directories
+    target_include_directories(forma_archive_utils PRIVATE
+        ${CMAKE_BINARY_DIR}/_deps/libarchive-src/libarchive
+        ${CMAKE_BINARY_DIR}/_deps/libarchive-build
+    )
 
-# Enable PIC for use in shared libraries (plugins)
-set_target_properties(forma_archive_utils PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-)
+    # Enable PIC for use in shared libraries (plugins)
+    set_target_properties(forma_archive_utils PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+    )
+endif()
 
 # ============================================================================
-# Installation
+# Installation (only when building standalone)
 # ============================================================================
 
-install(TARGETS forma_archive_utils
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-)
+# Only install when building standalone (not as part of main Forma project)
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    install(TARGETS forma_archive_utils
+        EXPORT FormaArchiveUtilsTargets
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION bin
+    )
 
-install(FILES
-    src/archive.hpp
-    DESTINATION include/forma/archive-utils
-)
+    install(FILES
+        src/archive.hpp
+        DESTINATION include/forma/archive-utils
+    )
 
-# Note: We don't export the target because archive_static from libarchive
-# cannot be exported. Users should build this plugin from source.
+    # Export targets
+    install(EXPORT FormaArchiveUtilsTargets
+        FILE FormaArchiveUtilsTargets.cmake
+        NAMESPACE FormaPlugins::
+        DESTINATION lib/cmake/FormaArchiveUtils
+    )
 
-# Create package config files manually
-include(CMakePackageConfigHelpers)
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/FormaArchiveUtilsConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY AnyNewerVersion
-)
+    # Create package config files
+    include(CMakePackageConfigHelpers)
 
-# Simple config file that just defines the target
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/FormaArchiveUtilsConfig.cmake"
-"add_library(FormaPlugins::forma_archive_utils STATIC IMPORTED)
-set_target_properties(FormaPlugins::forma_archive_utils PROPERTIES
-    IMPORTED_LOCATION \"\${CMAKE_CURRENT_LIST_DIR}/../../../lib/libforma_archive_utils.a\"
-    INTERFACE_INCLUDE_DIRECTORIES \"\${CMAKE_CURRENT_LIST_DIR}/../../../include/forma/archive-utils\"
-)
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/FormaArchiveUtilsConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY AnyNewerVersion
+    )
+
+    # Simple config file that includes the targets
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/FormaArchiveUtilsConfig.cmake"
+"include(\"\${CMAKE_CURRENT_LIST_DIR}/FormaArchiveUtilsTargets.cmake\")
 ")
 
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/FormaArchiveUtilsConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/FormaArchiveUtilsConfigVersion.cmake"
-    DESTINATION lib/cmake/FormaArchiveUtils
-)
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/FormaArchiveUtilsConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/FormaArchiveUtilsConfigVersion.cmake"
+        DESTINATION lib/cmake/FormaArchiveUtils
+    )
+endif()

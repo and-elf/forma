@@ -1,5 +1,5 @@
 #include "download.hpp"
-#include <archive-utils/archive.hpp>
+#include <archive.hpp>
 #include <curl/curl.h>
 #include <fstream>
 #include <filesystem>

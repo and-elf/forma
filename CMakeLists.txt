@@ -188,9 +188,12 @@ if(FORMA_BUILD_PLUGINS)
     # Make FormaCore findable in build tree
     set(FormaCore_DIR "${CMAKE_CURRENT_BINARY_DIR}")
     
+    add_subdirectory(plugins/archive-utils)
+    add_subdirectory(plugins/http-client)
     add_subdirectory(plugins/c-codegen)
     add_subdirectory(plugins/cpp-codegen)
     add_subdirectory(plugins/lvgl-renderer)
+    add_subdirectory(plugins/lvgl-native)
     add_subdirectory(plugins/lsp-server)
     add_subdirectory(plugins/cmake-generator)
     add_subdirectory(plugins/deb-deploy)

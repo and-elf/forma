@@ -32,16 +32,21 @@ include(${CPM_DOWNLOAD_LOCATION})
 # ============================================================================
 
 # Archive utils plugin (for extract_archive)
+# When building as part of the main Forma project, archive-utils is already added
+# When building standalone, we need to add it ourselves
 find_package(FormaArchiveUtils QUIET)
 if(NOT FormaArchiveUtils_FOUND)
-    # If not installed, try to build it from source if available
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../archive-utils/CMakeLists.txt")
-        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../archive-utils 
-                         ${CMAKE_CURRENT_BINARY_DIR}/archive-utils EXCLUDE_FROM_ALL)
-        set(ARCHIVE_UTILS_TARGET forma_archive_utils)
-    else()
-        message(FATAL_ERROR "FormaArchiveUtils plugin is required but not found. Build and install it first.")
+    # Check if we're building standalone or as part of main project
+    if(NOT TARGET forma_archive_utils)
+        # Only add subdirectory if the target doesn't exist yet
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../archive-utils/CMakeLists.txt")
+            add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../archive-utils 
+                             ${CMAKE_CURRENT_BINARY_DIR}/archive-utils EXCLUDE_FROM_ALL)
+        else()
+            message(FATAL_ERROR "FormaArchiveUtils plugin is required but not found. Build and install it first.")
+        endif()
     endif()
+    set(ARCHIVE_UTILS_TARGET forma_archive_utils)
 else()
     set(ARCHIVE_UTILS_TARGET FormaPlugins::forma_archive_utils)
 endif()
@@ -99,44 +104,47 @@ set_target_properties(forma_http_client PROPERTIES
 )
 
 # ============================================================================
-# Installation
+# Installation (only when building standalone)
 # ============================================================================
 
-install(TARGETS forma_http_client
-    EXPORT FormaHTTPClientTargets
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-    INCLUDES DESTINATION include/forma/http-client
-)
+# Only install when building standalone (not as part of main Forma project)
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    install(TARGETS forma_http_client
+        EXPORT FormaHTTPClientTargets
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION bin
+        INCLUDES DESTINATION include/forma/http-client
+    )
 
-install(FILES
-    src/download.hpp
-    DESTINATION include/forma/http-client
-)
+    install(FILES
+        src/download.hpp
+        DESTINATION include/forma/http-client
+    )
 
-install(EXPORT FormaHTTPClientTargets
-    FILE FormaHTTPClientTargets.cmake
-    NAMESPACE FormaPlugins::
-    DESTINATION lib/cmake/FormaHTTPClient
-)
+    install(EXPORT FormaHTTPClientTargets
+        FILE FormaHTTPClientTargets.cmake
+        NAMESPACE FormaPlugins::
+        DESTINATION lib/cmake/FormaHTTPClient
+    )
 
-# Create package config
-include(CMakePackageConfigHelpers)
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/FormaHTTPClientConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY AnyNewerVersion
-)
+    # Create package config
+    include(CMakePackageConfigHelpers)
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/FormaHTTPClientConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY AnyNewerVersion
+    )
 
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/FormaHTTPClientConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/FormaHTTPClientConfig.cmake"
-    INSTALL_DESTINATION lib/cmake/FormaHTTPClient
-)
+    configure_package_config_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/FormaHTTPClientConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/FormaHTTPClientConfig.cmake"
+        INSTALL_DESTINATION lib/cmake/FormaHTTPClient
+    )
 
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/FormaHTTPClientConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/FormaHTTPClientConfigVersion.cmake"
-    DESTINATION lib/cmake/FormaHTTPClient
-)
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/FormaHTTPClientConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/FormaHTTPClientConfigVersion.cmake"
+        DESTINATION lib/cmake/FormaHTTPClient
+    )
+endif()

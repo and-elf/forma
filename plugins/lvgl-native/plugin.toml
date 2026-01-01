@@ -1,0 +1,23 @@
+[plugin]
+name = "lvgl-native"
+kind = "renderer"
+api_version = "1.0.0"
+runtime = "native"
+
+[capabilities]
+provides = [
+    "renderer:lvgl-native",
+    "renderer:c",
+    "widgets:basic",
+    "widgets:lvgl",
+    "animation",
+    "events",
+    "layouts",
+    "native-window"
+]
+requires = ["sdl3", "lvgl"]
+
+[renderer]
+output_extension = ".c"
+output_language = "c"
+target_platforms = ["linux", "windows", "macos"]
