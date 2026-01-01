@@ -305,7 +305,13 @@ int main(int argc, char* argv[]) {
         init_opts.project_name = opts.project_name.empty() ? (opts.is_plugin ? "myplugin" : "myapp") : opts.project_name;
         init_opts.is_plugin = opts.is_plugin;
         init_opts.plugin_type = opts.plugin_type.empty() ? "renderer" : opts.plugin_type;
-        init_opts.project_dir = opts.project_path.empty() ? (opts.is_plugin ? init_opts.project_name : ".") : opts.project_path;
+        if (!opts.project_path.empty()) {
+            init_opts.project_dir = opts.project_path;
+        } else if (!opts.project_name.empty()) {
+            init_opts.project_dir = opts.project_name;
+        } else {
+            init_opts.project_dir = opts.is_plugin ? init_opts.project_name : ".";
+        }
         init_opts.verbose = opts.verbose;
         
         if (opts.is_plugin) {
