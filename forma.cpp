@@ -8,6 +8,7 @@
 #include "src/commands/init.hpp"
 #include "src/commands/deploy.hpp"
 #include "src/commands/build.hpp"
+#include "src/commands/run.hpp"
 #include "plugins/tracer/src/tracer_plugin.hpp"
 #include "plugins/lvgl-renderer/src/lvgl_renderer_builtin.hpp"
 #include <CLI/CLI.hpp>
@@ -37,6 +38,8 @@ struct CompilerOptions {
     bool debug = false;
     bool list_plugins = false;
     bool is_plugin = false;  // true for forma init plugin
+    bool flash = false;      // Flash to device after build
+    bool monitor = false;    // Start monitor after flash
 };
 
 int load_plugins(forma::PluginLoader& plugin_loader, const std::vector<std::string>& plugin_names,
@@ -240,7 +243,17 @@ int main(int argc, char* argv[]) {
     auto* build_cmd = app.add_subcommand("build", "Build project for target platform");
     build_cmd->add_option("--target", opts.target, "Target platform");
     build_cmd->add_option("--project", opts.project_path, "Project directory");
+    build_cmd->add_flag("--flash", opts.flash, "Flash to device after build (embedded targets)");
+    build_cmd->add_flag("--monitor", opts.monitor, "Start serial monitor after flash (embedded targets)");
     build_cmd->callback([&opts]() { opts.mode = "build"; });
+
+    // Run command
+    auto* run_cmd = app.add_subcommand("run", "Compile, build and run project");
+    run_cmd->add_option("--target", opts.target, "Target platform");
+    run_cmd->add_option("--project", opts.project_path, "Project directory");
+    run_cmd->add_flag("--flash", opts.flash, "Flash to device after build (embedded targets)");
+    run_cmd->add_flag("--monitor", opts.monitor, "Start serial monitor after flash (embedded targets)");
+    run_cmd->callback([&opts]() { opts.mode = "run"; });
 
     // Deploy command
     auto* deploy_cmd = app.add_subcommand("deploy", "Build and package project for deployment");
@@ -292,10 +305,22 @@ int main(int argc, char* argv[]) {
         build_opts.project_dir = opts.project_path.empty() ? "." : opts.project_path;
         build_opts.target = opts.target;
         build_opts.verbose = opts.verbose;
-        build_opts.flash = false;  // TODO: Add --flash flag
-        build_opts.monitor = false; // TODO: Add --monitor flag
+        build_opts.flash = opts.flash;
+        build_opts.monitor = opts.monitor;
         
         return forma::commands::run_build_command(build_opts);
+    }
+    
+    // Handle run command
+    if (opts.mode == "run") {
+        forma::commands::RunOptions run_opts;
+        run_opts.project_dir = opts.project_path.empty() ? "." : opts.project_path;
+        run_opts.target = opts.target;
+        run_opts.verbose = opts.verbose;
+        run_opts.flash = opts.flash;
+        run_opts.monitor = opts.monitor;
+        
+        return forma::commands::run_run_command(run_opts);
     }
     
     // Handle deploy command
