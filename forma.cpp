@@ -39,21 +39,21 @@ struct CompilerOptions {
     bool is_plugin = false;  // true for forma init plugin
 };
 
-int load_plugins(forma::PluginLoader& plugin_loader, const std::vector<std::string>& plugin_paths,
+int load_plugins(forma::PluginLoader& plugin_loader, const std::vector<std::string>& plugin_names,
                  forma::tracer::TracerPlugin*& active_tracer) {
     auto& tracer = forma::tracer::get_tracer();
     
-    for (const auto& plugin_path : plugin_paths) {
+    for (const auto& plugin_name : plugin_names) {
         std::string error_msg;
-        tracer.verbose(std::string("Loading plugin: ") + plugin_path);
+        tracer.verbose(std::string("Loading plugin: ") + plugin_name);
         
-        if (!plugin_loader.load_plugin(plugin_path, error_msg)) {
+        if (!plugin_loader.load_plugin_by_name(plugin_name, error_msg)) {
             tracer.error(error_msg);
             return 1;
         }
         
         // Plugin loaded successfully - metadata is available
-        tracer.info(std::string("✓ Loaded plugin from: ") + plugin_path);
+        tracer.info(std::string("✓ Loaded plugin: ") + plugin_name);
         
         // TODO: Check if this is a tracer plugin and switch to it
         // For now, tracer plugins aren't supported yet
@@ -67,19 +67,8 @@ int load_plugin_directories(forma::PluginLoader& plugin_loader, const std::vecto
     auto& tracer = forma::tracer::get_tracer();
     
     for (const auto& dir_path : plugin_dirs) {
-        tracer.verbose(std::string("Loading plugins from directory: ") + dir_path);
-        
-        std::vector<std::string> errors;
-        int loaded_count = plugin_loader.load_plugins_from_directory(dir_path, errors);
-        
-        if (loaded_count > 0) {
-            tracer.info(std::string("✓ Loaded ") + std::to_string(loaded_count) + " plugin(s) from: " + dir_path);
-        }
-        
-        // Report any errors
-        for (const auto& error : errors) {
-            tracer.error(error);
-        }
+        tracer.verbose(std::string("Adding plugin search path: ") + dir_path);
+        plugin_loader.add_plugin_search_path(dir_path);
     }
     
     return 0;
@@ -220,8 +209,8 @@ int main(int argc, char* argv[]) {
     app.add_flag("-v,--verbose", opts.verbose, "Enable verbose output");
     app.add_flag("--debug", opts.debug, "Enable debug output");
     app.add_option("--renderer", opts.renderer, "Renderer backend: js, sdl, lvgl, vulkan");
-    app.add_option("--plugin", opts.plugins, "Load plugin from shared library (.so)")->expected(1, -1);
-    app.add_option("--plugin-dir", opts.plugin_dirs, "Load all plugins from directory")->expected(1, -1);
+    app.add_option("--plugin", opts.plugins, "Load plugin by name (e.g., c-codegen, lvgl-renderer)")->expected(1, -1);
+    app.add_option("--plugin-dir", opts.plugin_dirs, "Add directory to plugin search path")->expected(1, -1);
     app.add_flag("--list-plugins", opts.list_plugins, "List all loaded plugins");
     app.add_option("--project", opts.project_path, "Project directory");
     app.add_option("input_file", opts.input_file, "Input file");

@@ -36,6 +36,7 @@ struct LoadedPlugin {
 class PluginLoader {
 private:
     std::vector<std::unique_ptr<LoadedPlugin>> loaded_plugins;
+    std::vector<std::string> plugin_search_paths;  // Custom search paths
     
 public:
     ~PluginLoader() = default;
@@ -169,6 +170,58 @@ public:
         }
         
         return loaded_count;
+    }
+    
+    // Load plugin by name from known plugin directories
+    // Example: load_plugin_by_name("c-codegen") looks for "forma-c-codegen.so"
+    bool load_plugin_by_name(const std::string& plugin_name, std::string& error_msg) {
+        // Standard plugin search paths (in order of priority)
+        std::vector<std::string> search_paths;
+        
+        // 0. User-added search paths (highest priority)
+        search_paths.insert(search_paths.end(), plugin_search_paths.begin(), plugin_search_paths.end());
+        
+        // 1. Current directory (for development)
+        search_paths.push_back(".");
+        
+        // 2. Relative to executable (for local installs)
+        if (auto exe_path = std::filesystem::read_symlink("/proc/self/exe"); std::filesystem::exists(exe_path)) {
+            auto plugin_dir = exe_path.parent_path() / "plugins";
+            if (std::filesystem::exists(plugin_dir)) {
+                search_paths.push_back(plugin_dir.string());
+            }
+        }
+        
+        // 3. System plugin directory
+        search_paths.push_back("/usr/local/lib/forma/plugins");
+        search_paths.push_back("/usr/lib/forma/plugins");
+        
+        // Try different naming conventions
+        std::vector<std::string> name_variants = {
+            "forma-" + plugin_name + ".so",
+            "libforma-" + plugin_name + ".so",
+            plugin_name + ".so"
+        };
+        
+        // Search for plugin
+        for (const auto& search_path : search_paths) {
+            for (const auto& variant : name_variants) {
+                auto full_path = std::filesystem::path(search_path) / variant;
+                if (std::filesystem::exists(full_path)) {
+                    return load_plugin(full_path.string(), error_msg);
+                }
+            }
+        }
+        
+        error_msg = "Plugin '" + plugin_name + "' not found in standard directories";
+        return false;
+    }
+    
+    // Add a directory to the plugin search path
+    void add_plugin_search_path(const std::string& dir_path) {
+        if (std::filesystem::exists(dir_path) && std::filesystem::is_directory(dir_path)) {
+            plugin_search_paths.push_back(dir_path);
+        }
     }
     
     // Register a built-in (statically-linked) plugin with metadata
