@@ -16,6 +16,7 @@ namespace forma {
 // Plugin function pointers loaded from dynamic library
 struct PluginFunctions {
     bool (*render)(const void* doc, const char* input_path, const char* output_path);
+    int (*build)(const char* project_dir, const char* config_path, bool verbose, bool flash, bool monitor);  // For build plugins
     void (*register_plugin)(void* host);  // Optional
     uint64_t (*get_metadata_hash)();  // Required - returns hash of expected TOML
 };
@@ -53,13 +54,19 @@ public:
         // Clear any existing error
         dlerror();
         
-        // Look for the forma_render function (required)
+        // Look for the forma_render function (optional - for renderer plugins)
         typedef bool (*RenderFunc)(const void*, const char*, const char*);
         RenderFunc render_fn = reinterpret_cast<RenderFunc>(dlsym(handle, "forma_render"));
+        dlerror(); // Clear error (it's optional)
         
-        const char* dlsym_error = dlerror();
-        if (dlsym_error || !render_fn) {
-            error_msg = std::string("Cannot find forma_render function: ") + (dlsym_error ? dlsym_error : "symbol not found");
+        // Look for the forma_build function (optional - for build plugins)
+        typedef int (*BuildFunc)(const char*, const char*, bool, bool, bool);
+        BuildFunc build_fn = reinterpret_cast<BuildFunc>(dlsym(handle, "forma_build"));
+        dlerror(); // Clear error (it's optional)
+        
+        // Plugin must have at least one function (render or build)
+        if (!render_fn && !build_fn) {
+            error_msg = "Plugin must provide at least one of: forma_render, forma_build";
             dlclose(handle);
             return false;
         }
@@ -73,7 +80,7 @@ public:
         typedef uint64_t (*MetadataHashFunc)();
         MetadataHashFunc hash_fn = reinterpret_cast<MetadataHashFunc>(dlsym(handle, "forma_plugin_metadata_hash"));
         
-        dlsym_error = dlerror();
+        const char* dlsym_error = dlerror();
         if (dlsym_error || !hash_fn) {
             error_msg = std::string("Cannot find forma_plugin_metadata_hash function: ") + (dlsym_error ? dlsym_error : "symbol not found");
             dlclose(handle);
@@ -126,11 +133,13 @@ public:
         auto loaded = std::make_unique<LoadedPlugin>();
         loaded->handle = handle;
         loaded->functions.render = render_fn;
+        loaded->functions.build = build_fn;
         loaded->functions.register_plugin = register_fn;
         loaded->functions.get_metadata_hash = hash_fn;
         loaded->path = path;
         loaded->metadata = std::move(metadata);
         loaded_plugins.push_back(std::move(loaded));
+
         
         // Call registration function if available
         if (register_fn) {

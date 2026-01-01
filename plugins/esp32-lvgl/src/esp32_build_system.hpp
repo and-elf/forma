@@ -165,6 +165,35 @@ public:
         return true;
     }
     
+    bool build() {
+        std::cout << "Building ESP32 project...\n";
+        
+        std::string build_cmd = "cd " + project_path + " && ";
+        
+        // Source IDF environment and build
+        build_cmd += "source " + config.idf_path + "/export.sh && idf.py build";
+        
+        return execute_command(build_cmd);
+    }
+    
+    bool flash() {
+        std::cout << "Flashing ESP32 device...\n";
+        
+        std::string flash_cmd = "cd " + project_path + " && ";
+        flash_cmd += "source " + config.idf_path + "/export.sh && idf.py flash";
+        
+        return execute_command(flash_cmd);
+    }
+    
+    bool monitor() {
+        std::cout << "Starting serial monitor...\n";
+        
+        std::string monitor_cmd = "cd " + project_path + " && ";
+        monitor_cmd += "source " + config.idf_path + "/export.sh && idf.py monitor";
+        
+        return execute_command(monitor_cmd);
+    }
+
 private:
     void generate_root_cmake() {
         std::ostringstream cmake;

@@ -62,4 +62,108 @@ bool setup_esp32_project(const char* project_dir, const char* config_file) {
     return true;
 }
 
+// Plugin interface for forma build command
+int forma_build(const char* project_dir, const char* config_path, bool verbose, bool flash, bool monitor) {
+    if (!project_dir) {
+        if (verbose) {
+            std::cerr << "Error: Invalid project directory\n";
+        }
+        return 1;
+    }
+    
+    if (verbose) {
+        std::cout << "ESP32-LVGL build plugin\n";
+        std::cout << "Project: " << project_dir << "\n";
+        if (config_path) {
+            std::cout << "Config: " << config_path << "\n";
+        }
+    }
+    
+    forma::esp32::ESP32BuildSystem builder(project_dir);
+    forma::esp32::ESP32Config config;
+    
+    // Load configuration from TOML if provided
+    if (config_path && std::filesystem::exists(config_path)) {
+        std::ifstream file(config_path);
+        std::ostringstream buffer;
+        buffer << file.rdbuf();
+        std::string toml_content = buffer.str();
+        
+        forma::esp32::parse_esp32_config(toml_content, config);
+        
+        if (verbose) {
+            std::cout << "Loaded ESP32 configuration:\n";
+            std::cout << "  IDF Version: " << config.idf_version << "\n";
+            std::cout << "  Target: " << config.target << "\n";
+            if (!config.idf_path.empty()) {
+                std::cout << "  IDF Path: " << config.idf_path << "\n";
+            }
+        }
+    }
+    
+    builder.set_config(config);
+    
+    // Setup the project (ESP-IDF, toolchain, etc.)
+    if (verbose) {
+        std::cout << "Setting up ESP32 project...\n";
+    }
+    
+    if (!builder.setup_project()) {
+        if (verbose) {
+            std::cerr << "Error: Failed to setup ESP32 project\n";
+        }
+        return 1;
+    }
+    
+    // Build the project
+    if (verbose) {
+        std::cout << "Building ESP32 project...\n";
+    }
+    
+    if (!builder.build()) {
+        if (verbose) {
+            std::cerr << "Error: Build failed\n";
+        }
+        return 1;
+    }
+    
+    if (verbose) {
+        std::cout << "Build complete!\n";
+    }
+    
+    // Flash if requested
+    if (flash) {
+        if (verbose) {
+            std::cout << "Flashing to device...\n";
+        }
+        
+        if (!builder.flash()) {
+            if (verbose) {
+                std::cerr << "Error: Flash failed\n";
+            }
+            return 1;
+        }
+        
+        if (verbose) {
+            std::cout << "Flash complete!\n";
+        }
+    }
+    
+    // Start monitor if requested
+    if (monitor) {
+        if (verbose) {
+            std::cout << "Starting serial monitor...\n";
+        }
+        
+        if (!builder.monitor()) {
+            if (verbose) {
+                std::cerr << "Error: Monitor failed\n";
+            }
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
 } // extern "C"

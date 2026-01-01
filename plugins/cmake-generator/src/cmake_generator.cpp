@@ -3,6 +3,8 @@
 #include <core/toolchain.hpp>
 #include <filesystem>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <map>
 #include <memory>
 
@@ -421,5 +423,99 @@ namespace cmake_vtable {
             g_cmake_generator->shutdown();
             g_cmake_generator.reset();
         }
+    }
+}
+
+// Plugin interface for forma build command
+extern "C" {
+    int forma_build(const char* project_dir, const char* config_path, bool verbose, bool /*flash*/, bool /*monitor*/) {
+        if (!project_dir) {
+            std::cerr << "Error: Invalid project directory\n";
+            return 1;
+        }
+        
+        if (verbose) {
+            std::cout << "CMake build plugin\n";
+            std::cout << "Project: " << project_dir << "\n";
+            if (config_path) {
+                std::cout << "Config: " << config_path << "\n";
+            }
+        }
+        
+        // Create generator instance
+        auto generator = std::make_unique<CMakeGenerator>();
+        CMakeGeneratorConfig config;
+        
+        // Set defaults
+        config.cmake_minimum_version = "3.20";
+        config.cxx_standard = "20";
+        config.generator = "Ninja";
+        config.build_type = "Release";
+        config.project_name = "FormaProject";
+        config.target_name = "app";
+        config.output_dir = "build";
+        
+        // Load configuration from TOML if provided
+        if (config_path && std::filesystem::exists(config_path)) {
+            std::ifstream file(config_path);
+            std::ostringstream buffer;
+            buffer << file.rdbuf();
+            std::string toml_content = buffer.str();
+            
+            // Parse TOML
+            auto doc = forma::toml::parse(toml_content);
+            
+            // Get [cmake] section
+            if (auto* cmake_table = doc.get_table("cmake")) {
+                config.load_from_toml(*cmake_table);
+                
+                if (verbose) {
+                    std::cout << "Loaded CMake configuration:\n";
+                    std::cout << "  Project: " << config.project_name << "\n";
+                    std::cout << "  Target: " << config.target_name << "\n";
+                    std::cout << "  Build type: " << config.build_type << "\n";
+                    std::cout << "  C++ standard: " << config.cxx_standard << "\n";
+                }
+            }
+        }
+        
+        // Set config
+        generator->set_config(config);
+        
+        // Initialize
+        generator->init(nullptr);
+        
+        // Generate CMakeLists.txt
+        std::string cmakelist_path = std::string(project_dir) + "/CMakeLists.txt";
+        if (verbose) {
+            std::cout << "Generating: " << cmakelist_path << "\n";
+        }
+        
+        generator->generate_cmakelists(cmakelist_path);
+        
+        // Configure and build
+        if (verbose) {
+            std::cout << "Configuring project...\n";
+        }
+        
+        if (!generator->run_cmake_configure()) {
+            std::cerr << "Error: CMake configuration failed\n";
+            return 1;
+        }
+        
+        if (verbose) {
+            std::cout << "Building project...\n";
+        }
+        
+        if (!generator->run_cmake_build()) {
+            std::cerr << "Error: Build failed\n";
+            return 1;
+        }
+        
+        if (verbose) {
+            std::cout << "Build complete!\n";
+        }
+        
+        return 0;
     }
 }
