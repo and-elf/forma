@@ -2,6 +2,9 @@
 
 #include <parser/ir.hpp>
 #include <parser/semantic.hpp>
+// Note: core/pipeline.hpp provides forma::pipeline::resolve_imports,
+// forma::pipeline::run_semantic_analysis, and forma::pipeline::collect_assets
+// for full compilation. LSP uses direct APIs for faster interactive feedback.
 #include <string_view>
 #include <string>
 #include <array>
@@ -337,7 +340,7 @@ struct LSPDocumentManager {
         bool need_parse = !doc.cache_valid || doc.cached_source != current_source;
         
         if (need_parse) {
-            // Parse and cache
+            // Parse and cache using forma parser
             std::cerr << "  Debug: Parsing document, source length=" << doc.cached_source.size() << std::endl;
             auto parsed = forma::parse_document(doc.cached_source);
             if (!doc.cached_ast) {
@@ -351,7 +354,9 @@ struct LSPDocumentManager {
                      << ", symbols=" << doc.cached_ast->symbols.count << std::endl;
         }
         
-        // Always run semantic analysis (it's fast and updates diagnostics)
+        // Run semantic analysis using forma::analyze_document
+        // Note: LSP doesn't need import resolution or asset collection for basic diagnostics
+        // Those would require file system access and slow down interactive editing
         if (doc.cached_ast) {
             auto sem_diagnostics = forma::analyze_document(*doc.cached_ast);
             convert_diagnostics(doc, sem_diagnostics);
