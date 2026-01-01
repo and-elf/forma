@@ -30,18 +30,17 @@ struct ProjectConfig {
     std::vector<std::string> plugins;
 };
 
-ProjectConfig read_project_config(const std::string& project_dir, forma::tracer::TracerPlugin& tracer) {
+ProjectConfig read_project_config(const std::string& project_dir, forma::tracer::TracerPlugin& tracer, forma::fs::IFileSystem& fs) {
     ProjectConfig config;
     
-    std::filesystem::path project_path(project_dir);
-    std::filesystem::path toml_path = project_path / "project.toml";
+    std::string toml_path = project_dir + "/project.toml";
     
     // Try forma.toml if project.toml doesn't exist
-    if (!std::filesystem::exists(toml_path)) {
-        toml_path = project_path / "forma.toml";
+    if (!fs.exists(toml_path)) {
+        toml_path = project_dir + "/forma.toml";
     }
-    
-    if (!std::filesystem::exists(toml_path)) {
+
+    if (!fs.exists(toml_path)) {
         tracer.error("No project.toml or forma.toml found in project directory");
         return config;
     }
@@ -49,15 +48,7 @@ ProjectConfig read_project_config(const std::string& project_dir, forma::tracer:
     tracer.verbose(std::string("Reading project configuration: ") + toml_path.string());
     
     // Read TOML file
-    std::ifstream file(toml_path);
-    if (!file.is_open()) {
-        tracer.error(std::string("Failed to open: ") + toml_path.string());
-        return config;
-    }
-    
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string toml_content = buffer.str();
+    std::string toml_content = fs.read_file(toml_path);
     
     // Parse TOML
     auto doc = forma::toml::parse(toml_content);
@@ -76,7 +67,9 @@ ProjectConfig read_project_config(const std::string& project_dir, forma::tracer:
     }
     
     // Find all .fml files in src/ directory
-    auto src_dir = project_path / "src";
+    // Source file discovery: naive approach using filesystem for now
+    std::filesystem::path src_dir(project_dir);
+    src_dir /= "src";
     if (std::filesystem::exists(src_dir)) {
         for (const auto& entry : std::filesystem::recursive_directory_iterator(src_dir)) {
             if (entry.is_regular_file() && entry.path().extension() == ".fml") {
@@ -99,9 +92,10 @@ int run_build_command(const BuildOptions& opts) {
     tracer.info("===================\n");
     
     std::string project_dir = opts.project_dir.empty() ? "." : opts.project_dir;
+    forma::fs::RealFileSystem realfs;
     
     // Read project configuration
-    auto config = read_project_config(project_dir, tracer);
+    auto config = read_project_config(project_dir, tracer, realfs);
     
     if (config.build_system.empty()) {
         tracer.error("No build system specified in project configuration");
@@ -126,61 +120,52 @@ int run_build_command(const BuildOptions& opts) {
     if (!config.source_files.empty() && !config.renderer.empty()) {
         tracer.begin_stage("Generating code");
         
-        forma::PluginLoader plugin_loader;
-        
+        forma::PluginLoader plugin_loader_impl;
+        forma::IPluginLoader& plugin_loader = plugin_loader_impl;
+
         // Load renderer plugin
         std::string error_msg;
         if (!plugin_loader.load_plugin_by_name(config.renderer, error_msg)) {
             tracer.error(std::string("Failed to load renderer plugin: ") + error_msg);
             return 1;
         }
-        
+
         // Compile each source file
         for (const auto& source_file : config.source_files) {
             tracer.verbose(std::string("Compiling: ") + source_file);
-            
-            // Read source
-            std::ifstream file(source_file);
-            std::stringstream buffer;
-            buffer << file.rdbuf();
-            std::string source = buffer.str();
-            
+
+            // Read source using realfs for now
+            std::string source = realfs.read_file(source_file);
+
             // Parse
             auto doc = forma::parse_document(source);
-            
+
             // Run pipeline
             forma::pipeline::resolve_imports(doc, source_file, tracer);
             if (forma::pipeline::run_semantic_analysis(doc, tracer) != 0) {
                 return 1;
             }
             forma::pipeline::collect_assets(doc, tracer);
-            
-            // Find renderer plugin
-            forma::LoadedPlugin* renderer_plugin = nullptr;
-            for (const auto& plugin : plugin_loader.get_loaded_plugins()) {
-                if (plugin->metadata && plugin->metadata->is_renderer()) {
-                    renderer_plugin = plugin.get();
-                    break;
-                }
-            }
-            
-            if (!renderer_plugin || !renderer_plugin->functions.render) {
-                tracer.error("Renderer plugin does not provide render function");
+
+            // Get renderer adapter
+            auto renderer_adapter = plugin_loader.get_renderer_adapter(config.renderer);
+            if (!renderer_adapter) {
+                tracer.error("Renderer plugin does not provide render adapter");
                 return 1;
             }
-            
-            // Generate output path
-            std::filesystem::path output_path = std::filesystem::path(source_file).replace_extension(
-                renderer_plugin->metadata->output_extension
-            );
-            
-            // Render
-            if (!renderer_plugin->functions.render(&doc, source_file.c_str(), output_path.string().c_str())) {
+
+            // Generate output path (use metadata)
+            auto plugin = plugin_loader.find_plugin(config.renderer);
+            std::string out_ext = plugin->metadata->output_extension;
+            std::string output_path = std::filesystem::path(source_file).replace_extension(out_ext).string();
+
+            // Call adapter (it will use IFileSystem to write output back)
+            if (!renderer_adapter(&doc, source_file, output_path, realfs)) {
                 tracer.error(std::string("Code generation failed for: ") + source_file);
                 return 1;
             }
-            
-            tracer.info(std::string("✓ Generated: ") + output_path.string());
+
+            tracer.info(std::string("✓ Generated: ") + output_path);
         }
         
         tracer.end_stage();
@@ -189,8 +174,9 @@ int run_build_command(const BuildOptions& opts) {
     // Step 2: Invoke build system plugin
     tracer.begin_stage("Building project");
     
-    forma::PluginLoader build_plugin_loader;
-    
+    forma::PluginLoader build_plugin_loader_impl;
+    forma::IPluginLoader& build_plugin_loader = build_plugin_loader_impl;
+
     // Load build system plugin
     std::string error_msg;
     if (!build_plugin_loader.load_plugin_by_name(config.build_system, error_msg)) {
@@ -199,36 +185,21 @@ int run_build_command(const BuildOptions& opts) {
         tracer.info("Available build plugins: cmake-generator, esp32-lvgl");
         return 1;
     }
-    
-    // Find the build plugin
-    forma::LoadedPlugin* build_plugin = nullptr;
-    for (const auto& plugin : build_plugin_loader.get_loaded_plugins()) {
-        if (plugin->metadata && plugin->metadata->is_build()) {
-            build_plugin = plugin.get();
-            break;
-        }
-    }
-    
-    if (!build_plugin || !build_plugin->functions.build) {
-        tracer.error("Build plugin does not provide build function");
-        tracer.info("Build plugins must export a 'forma_build' function");
+
+    // Get build adapter
+    auto build_adapter = build_plugin_loader.get_build_adapter(config.build_system);
+    if (!build_adapter) {
+        tracer.error("Build plugin does not provide build adapter");
+        tracer.info("Build plugins must export a 'forma_build' function or adapter");
         return 1;
     }
-    
-    // Call the build function
-    // forma_build(project_dir, config_path, verbose, flash, monitor)
-    std::filesystem::path config_path = std::filesystem::path(project_dir) / "project.toml";
-    if (!std::filesystem::exists(config_path)) {
-        config_path = std::filesystem::path(project_dir) / "forma.toml";
-    }
-    
-    int result = build_plugin->functions.build(
-        project_dir.c_str(),
-        config_path.string().c_str(),
-        opts.verbose,
-        opts.flash,
-        opts.monitor
-    );
+
+    // Determine config path within filesystem
+    std::string config_path = project_dir + "/project.toml";
+    if (!realfs.exists(config_path)) config_path = project_dir + "/forma.toml";
+
+    // Call build adapter (it may create a temp project on disk and run plugin)
+    int result = build_adapter(project_dir, config_path, realfs, opts.verbose, opts.flash, opts.monitor);
     
     tracer.end_stage();
     

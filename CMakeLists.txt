@@ -135,6 +135,20 @@ if(FORMA_BUILD_TESTS)
         DEPENDS forma_tokenizer_tests forma_parser_tests forma_diagnostic_tests forma_toml_tests
         COMMENT "Running all tests..."
     )
+
+    # Bugspray-based tests (use the bundled bugspray runner)
+    add_executable(init_tests
+        Testing/init_tests.cpp
+    )
+    target_link_libraries(init_tests PRIVATE forma_core bugspray-with-main)
+
+    add_executable(plugin_loader_tests
+        Testing/plugin_loader_tests.cpp
+    )
+    target_link_libraries(plugin_loader_tests PRIVATE forma_core bugspray-with-main)
+
+    add_test(NAME init_tests COMMAND init_tests)
+    add_test(NAME plugin_loader_tests COMMAND plugin_loader_tests)
     
     # Coverage target (requires gcovr)
     if(FORMA_ENABLE_COVERAGE)

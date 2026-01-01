@@ -43,7 +43,7 @@ struct CompilerOptions {
     bool monitor = false;    // Start monitor after flash
 };
 
-int load_plugins(forma::PluginLoader& plugin_loader, const std::vector<std::string>& plugin_names,
+int load_plugins(forma::IPluginLoader& plugin_loader, const std::vector<std::string>& plugin_names,
                  forma::tracer::TracerPlugin*& active_tracer) {
     auto& tracer = forma::tracer::get_tracer();
     
@@ -67,7 +67,7 @@ int load_plugins(forma::PluginLoader& plugin_loader, const std::vector<std::stri
     return 0;
 }
 
-int load_plugin_directories(forma::PluginLoader& plugin_loader, const std::vector<std::string>& plugin_dirs) {
+int load_plugin_directories(forma::IPluginLoader& plugin_loader, const std::vector<std::string>& plugin_dirs) {
     auto& tracer = forma::tracer::get_tracer();
     
     for (const auto& dir_path : plugin_dirs) {
@@ -100,7 +100,7 @@ std::string read_source_file(const std::string& input_file, forma::tracer::Trace
 
 template<typename DocType>
 int generate_code(const DocType& doc, const std::string& input_file, 
-                  const std::string& renderer, forma::PluginLoader& plugin_loader,
+                  const std::string& renderer, forma::IPluginLoader& plugin_loader,
                   forma::tracer::TracerPlugin& tracer) {
     // Check renderer selection before code generation
     std::vector<std::string> available_renderers;
@@ -158,7 +158,7 @@ int generate_code(const DocType& doc, const std::string& input_file,
     // Use plugin renderer if found
     if (selected_plugin) {
         tracer.verbose(std::string("Using plugin renderer: ") + selected_plugin->metadata->name);
-        
+
         // Get output extension from metadata
         std::string extension = ".gen";  // default fallback
         if (!selected_plugin->metadata->output_extension.empty()) {
@@ -166,25 +166,23 @@ int generate_code(const DocType& doc, const std::string& input_file,
             tracer.verbose(std::string("Using output extension from metadata: ") + extension);
         }
         output_file += extension;
-        
+
         tracer.verbose(std::string("Output: ") + output_file);
-        
-        // Call plugin's render function
-        if (selected_plugin->functions.render) {
-            bool success = selected_plugin->functions.render(
-                &doc, input_file.c_str(), output_file.c_str()
-            );
-            
-            if (!success) {
-                tracer.error("Plugin rendering failed");
-                return 1;
-            }
-            
-            tracer.end_stage();
-        } else {
-            tracer.error("Plugin does not provide a render callback");
+
+        // Use adapter if available
+        auto renderer_adapter = plugin_loader.get_renderer_adapter(selected_plugin->metadata->name);
+        if (!renderer_adapter) {
+            tracer.error("Plugin does not provide a render adapter");
             return 1;
         }
+
+        // Use RealFileSystem for CLI compile
+        forma::fs::RealFileSystem realfs;
+        if (!renderer_adapter(&doc, input_file, output_file, realfs)) {
+            tracer.error("Plugin rendering failed");
+            return 1;
+        }
+        tracer.end_stage();
     } 
     // No renderer found - error
     else {
@@ -372,7 +370,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Load plugins
-    forma::PluginLoader plugin_loader;
+    auto plugin_loader = std::make_unique<forma::PluginLoader>();
     forma::tracer::TracerPlugin* active_tracer = &tracer;
     
     // Register built-in LVGL renderer plugin with inline metadata
@@ -385,22 +383,22 @@ int main(int argc, char* argv[]) {
     lvgl_metadata->output_extension = ".c";
     lvgl_metadata->output_language = "c";
     
-    plugin_loader.register_builtin_plugin(
+    plugin_loader->register_builtin_plugin(
         forma::lvgl::lvgl_builtin_render,
         nullptr,
         std::move(lvgl_metadata)
     );
     
-    if (load_plugins(plugin_loader, opts.plugins, active_tracer) != 0) {
+    if (load_plugins(*plugin_loader, opts.plugins, active_tracer) != 0) {
         return 1;
     }
     
-    if (load_plugin_directories(plugin_loader, opts.plugin_dirs) != 0) {
+    if (load_plugin_directories(*plugin_loader, opts.plugin_dirs) != 0) {
         return 1;
     }
     
     if (opts.list_plugins) {
-        plugin_loader.print_loaded_plugins();
+        plugin_loader->print_loaded_plugins();
         return 0;
     }
 
@@ -455,5 +453,5 @@ int main(int argc, char* argv[]) {
     }
 
     // Generate code
-    return generate_code(doc, opts.input_file, opts.renderer, plugin_loader, *active_tracer);
+    return generate_code(doc, opts.input_file, opts.renderer, *plugin_loader, *active_tracer);
 }

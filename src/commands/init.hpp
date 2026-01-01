@@ -8,6 +8,8 @@
 #include <sstream>
 #include <cstdlib>
 
+#include "core/fs/i_file_system.hpp"
+
 namespace forma::commands {
 
 struct InitOptions {
@@ -121,29 +123,22 @@ App {
 
 
 
-// Create directory structure for new project
-bool create_project_structure(const InitOptions& opts) {
-    namespace fs = std::filesystem;
-    
+bool create_project_structure(const InitOptions& opts, forma::fs::IFileSystem& fsys) {
     try {
-        // Create main project directory
         if (opts.project_dir != ".") {
-            fs::create_directories(opts.project_dir);
+            fsys.create_dirs(opts.project_dir);
         }
-        
-        fs::path proj_path(opts.project_dir);
-        
-        // Create subdirectories
-        fs::create_directories(proj_path / "src");
-        fs::create_directories(proj_path / "lib");
-        fs::create_directories(proj_path / "lib" / "forma");
-        fs::create_directories(proj_path / "build");
-        fs::create_directories(proj_path / "assets");
-        
+
+        fsys.create_dirs(opts.project_dir + "/src");
+        fsys.create_dirs(opts.project_dir + "/lib");
+        fsys.create_dirs(opts.project_dir + "/lib/forma");
+        fsys.create_dirs(opts.project_dir + "/build");
+        fsys.create_dirs(opts.project_dir + "/assets");
+
         if (opts.verbose) {
             std::cout << "✓ Created directory structure" << std::endl;
         }
-        
+
         return true;
     } catch (const std::exception& e) {
         std::cerr << "Error creating project structure: " << e.what() << std::endl;
@@ -152,79 +147,54 @@ bool create_project_structure(const InitOptions& opts) {
 }
 
 // Write project files
-bool write_project_files(const InitOptions& opts) {
-    namespace fs = std::filesystem;
-    fs::path proj_path(opts.project_dir);
-    
+// Write project files using IFileSystem
+bool write_project_files(const InitOptions& opts, forma::fs::IFileSystem& fsys) {
     try {
         // Write forma.toml
-        std::ofstream toml_file(proj_path / "forma.toml");
-        if (!toml_file) {
-            std::cerr << "Error: Could not create forma.toml" << std::endl;
-            return false;
-        }
-        toml_file << generate_project_toml(opts);
-        toml_file.close();
-        
+        fsys.write_file(opts.project_dir + "/forma.toml", generate_project_toml(opts));
+
         if (opts.verbose) {
             std::cout << "✓ Created forma.toml" << std::endl;
         }
-        
+
         // Write main.forma
-        std::ofstream main_file(proj_path / "src" / "main.forma");
-        if (!main_file) {
-            std::cerr << "Error: Could not create src/main.forma" << std::endl;
-            return false;
-        }
-        main_file << generate_main_forma(opts);
-        main_file.close();
-        
+        fsys.write_file(opts.project_dir + "/src/main.forma", generate_main_forma(opts));
+
         if (opts.verbose) {
             std::cout << "✓ Created src/main.forma" << std::endl;
         }
-        
+
         // Write .gitignore
-        std::ofstream gitignore(proj_path / ".gitignore");
-        if (gitignore) {
-            gitignore << "build/\n";
-            gitignore << "*.o\n";
-            gitignore << "*.so\n";
-            gitignore << "*.a\n";
-            gitignore << opts.project_name << "\n";
-            gitignore << ".vscode/\n";
-            gitignore << ".DS_Store\n";
-            gitignore.close();
-            
-            if (opts.verbose) {
-                std::cout << "✓ Created .gitignore" << std::endl;
-            }
+        std::string gitignore = "build/\n*.o\n*.so\n*.a\n" + opts.project_name + "\n.vscode/\n.DS_Store\n";
+        fsys.write_file(opts.project_dir + "/.gitignore", gitignore);
+
+        if (opts.verbose) {
+            std::cout << "✓ Created .gitignore" << std::endl;
         }
-        
+
         // Write README.md
-        std::ofstream readme(proj_path / "README.md");
-        if (readme) {
-            readme << "# " << opts.project_name << "\n\n";
-            readme << "A Forma application.\n\n";
-            readme << "## Building\n\n";
-            readme << "```bash\n";
-            readme << "forma src/main.forma\n";
-            readme << "```\n\n";
-            readme << "## Configuration\n\n";
-            readme << "See `forma.toml` for project settings.\n\n";
-            
-            if (!opts.target_triple.empty()) {
-                readme << "## Cross-Compilation\n\n";
-                readme << "This project is configured for cross-compilation to: `" << opts.target_triple << "`\n\n";
-                readme << "The toolchain will be downloaded automatically on first build.\n\n";
-            }
-            
-            readme.close();
-            
-            if (opts.verbose) {
-                std::cout << "✓ Created README.md" << std::endl;
-            }
+        std::ostringstream readme;
+        readme << "# " << opts.project_name << "\n\n";
+        readme << "A Forma application.\n\n";
+        readme << "## Building\n\n";
+        readme << "```bash\n";
+        readme << "forma src/main.forma\n";
+        readme << "```\n\n";
+        readme << "## Configuration\n\n";
+        readme << "See `forma.toml` for project settings.\n\n";
+
+        if (!opts.target_triple.empty()) {
+            readme << "## Cross-Compilation\n\n";
+            readme << "This project is configured for cross-compilation to: `" << opts.target_triple << "`\n\n";
+            readme << "The toolchain will be downloaded automatically on first build.\n\n";
         }
-        
+
+        fsys.write_file(opts.project_dir + "/README.md", readme.str());
+
+        if (opts.verbose) {
+            std::cout << "✓ Created README.md" << std::endl;
+        }
+
         return true;
     } catch (const std::exception& e) {
         std::cerr << "Error writing project files: " << e.what() << std::endl;
@@ -233,9 +203,16 @@ bool write_project_files(const InitOptions& opts) {
 }
 
 // Main init command implementation
+int run_init_command(const InitOptions& opts, forma::fs::IFileSystem& fsys);
+
 int run_init_command(const InitOptions& opts) {
+    forma::fs::RealFileSystem real;
+    return run_init_command(opts, real);
+}
+
+int run_init_command(const InitOptions& opts, forma::fs::IFileSystem& fsys) {
     std::cout << "Initializing Forma project: " << opts.project_name << std::endl;
-    
+
     if (opts.verbose) {
         std::cout << "\nConfiguration:" << std::endl;
         std::cout << "  Name: " << opts.project_name << std::endl;
@@ -250,27 +227,27 @@ int run_init_command(const InitOptions& opts) {
         std::cout << "  Directory: " << opts.project_dir << std::endl;
         std::cout << std::endl;
     }
-    
+
     // Create project structure
-    if (!create_project_structure(opts)) {
+    if (!create_project_structure(opts, fsys)) {
         return 1;
     }
-    
+
     // Write project files
-    if (!write_project_files(opts)) {
+    if (!write_project_files(opts, fsys)) {
         return 1;
     }
-    
+
     std::cout << "\n✓ Project initialized successfully!" << std::endl;
     std::cout << "\nNext steps:" << std::endl;
-    
+
     if (opts.project_dir != ".") {
         std::cout << "  cd " << opts.project_dir << std::endl;
     }
-    
+
     std::cout << "  forma build" << std::endl;
     std::cout << "\nFor more information, see README.md" << std::endl;
-    
+
     return 0;
 }
 
