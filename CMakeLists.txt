@@ -142,6 +142,11 @@ if(FORMA_BUILD_TESTS)
     )
     target_link_libraries(init_tests PRIVATE forma_core bugspray-with-main)
 
+    add_executable(integration_full_stack_tests
+        Testing/integration_full_stack_tests.cpp
+    )
+    target_link_libraries(integration_full_stack_tests PRIVATE forma_core bugspray-with-main)
+
     add_executable(plugin_loader_tests
         Testing/plugin_loader_tests.cpp
     )
@@ -149,6 +154,7 @@ if(FORMA_BUILD_TESTS)
 
     add_test(NAME init_tests COMMAND init_tests)
     add_test(NAME plugin_loader_tests COMMAND plugin_loader_tests)
+    add_test(NAME integration_full_stack_tests COMMAND integration_full_stack_tests)
     
     # Coverage target (requires gcovr)
     if(FORMA_ENABLE_COVERAGE)
