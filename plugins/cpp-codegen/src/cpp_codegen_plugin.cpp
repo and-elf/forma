@@ -55,4 +55,26 @@ bool forma_render(const void* doc_ptr, const char* input_path, const char* outpu
     }
 }
 
+// Host-aware render variant
+bool forma_render_host(void* host_ptr, const void* doc_ptr, const char* input_path, const char* output_path) {
+    auto* host = static_cast<forma::HostContext*>(host_ptr);
+    (void)input_path;
+    if (!doc_ptr || !output_path) return false;
+    try {
+        const auto* doc = static_cast<const forma::Document<32,16,16,32,64,64>*>(doc_ptr);
+        forma::codegen::CppCodeGenerator<65536> generator;
+        generator.generate(*doc);
+        auto out_str = generator.get_output();
+        if (host && host->stream_io.open_write(output_path, out_str)) {
+            std::cout << "[C++ Codegen] Generated " << out_str.size() << " bytes to " << output_path << "\n";
+            return true;
+        }
+        std::ofstream out(output_path);
+        if (!out) return false;
+        out << out_str;
+        out.close();
+        return true;
+    } catch (...) { return false; }
+}
+
 } // extern "C"

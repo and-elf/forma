@@ -4,6 +4,7 @@
 #include <functional>
 #include <cstdint>
 #include <optional>
+#include "../../src/core/io/write_stream.hpp"
 
 namespace forma::download {
 
@@ -54,6 +55,13 @@ DownloadResult download_file(
     const DownloadOptions& options = DownloadOptions{}
 );
 
+// Host-aware variant: accepts HostContext* as first parameter
+bool forma_download_host(void* host_ptr,
+    const std::string& url,
+    const std::string& output_path,
+    const DownloadOptions& options = DownloadOptions{}
+);
+
 /**
  * Download content to memory
  * 
@@ -81,6 +89,13 @@ bool extract_archive(
     int strip_components = 0
 );
 
+// Host-aware extract: extracts into a temporary disk dir then copies into host filesystem
+bool forma_extract_host(void* host_ptr,
+    const std::string& archive_path,
+    const std::string& output_dir,
+    int strip_components = 0
+);
+
 /**
  * Download and extract an archive in one operation
  * Archive file is automatically deleted after extraction
@@ -97,5 +112,20 @@ bool download_and_extract(
     int strip_components = 0,
     const DownloadOptions& options = DownloadOptions{}
 );
+
+// Host-aware download and extract
+bool forma_download_and_extract_host(void* host_ptr,
+    const std::string& url,
+    const std::string& output_dir,
+    int strip_components = 0,
+    const DownloadOptions& options = DownloadOptions{}
+);
+
+// Stream download into an OpenWriteStreamFn (returns true on success)
+using OpenWriteStreamFn = std::function<forma::io::WriteStreamPtr(const std::string& path)>;
+bool download_to_stream(const std::string& url, OpenWriteStreamFn writer_fn, const DownloadOptions& options = DownloadOptions{});
+
+// Host-aware stream download: uses HostContext->stream_io.open_write_stream
+bool forma_download_to_stream_host(void* host_ptr, const std::string& url, const std::string& output_path, const DownloadOptions& options = DownloadOptions{});
 
 } // namespace forma::download

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "toml/toml.hpp"
+#include "core/toml_io.hpp"
 #include <string>
 #include <vector>
 #include <filesystem>
@@ -126,25 +126,20 @@ inline std::unique_ptr<PluginMetadata> load_plugin_metadata_from_string(const ch
 
 // Load plugin metadata from a plugin.toml file
 inline std::unique_ptr<PluginMetadata> load_plugin_metadata(const std::filesystem::path& toml_path) {
-    if (!std::filesystem::exists(toml_path)) {
+    // Use RealFileSystem + core TOML helper
+    forma::fs::RealFileSystem realfs;
+    auto doc_opt = forma::core::parse_toml_from_fs(realfs, toml_path.string());
+    if (!doc_opt) return nullptr;
+
+    // Re-serialize minimal TOML for the existing parser from string path
+    // The helper above parsed it; we'll now reconstruct a simple string and call existing loader.
+    // For now, reuse the original load from string by reading file content.
+    try {
+        std::string content = realfs.read_file(toml_path.string());
+        return load_plugin_metadata_from_string(content.c_str());
+    } catch (...) {
         return nullptr;
     }
-    
-    // Read the TOML file
-    std::ifstream file(toml_path);
-    if (!file) {
-        return nullptr;
-    }
-    
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string content = buffer.str();
-    
-    if (content.empty()) {
-        return nullptr;
-    }
-    
-    return load_plugin_metadata_from_string(content.c_str());
 }
 
 // Find plugin.toml for a given plugin path

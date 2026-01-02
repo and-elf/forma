@@ -39,25 +39,23 @@ TEST_CASE("PluginLoader - BuiltinBuildSyncsToMemoryFS")
 
     // Overwrite functions.build and build_adapter
     loaded->functions.build = test_builtin_build;
-    loaded->build_adapter = [ptr = loaded.get()](const std::string& project_dir, const std::string& /*config_path*/, forma::fs::IFileSystem& /*fs*/, bool /*verbose*/, bool /*flash*/, bool /*monitor*/) -> int {
+    loaded->build_adapter = [ptr = loaded.get()](const std::string& project_dir, const std::string& /*config_path*/, forma::fs::IFileSystem& fs, bool /*verbose*/, bool /*flash*/, bool /*monitor*/) -> int {
         // Call the C function with a temp on-disk project dir
         std::filesystem::path tmp = std::filesystem::temp_directory_path() / ("test_plugin_proj_" + std::to_string(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
         std::filesystem::create_directories(tmp);
         int rc = ptr->functions.build(tmp.string().c_str(), nullptr, false, false, false);
 
         // Sync files back to host_context filesystem if present
-        if (ptr->host_context && ptr->host_context->filesystem) {
-            auto& tfs = *ptr->host_context->filesystem;
-            for (auto& p : std::filesystem::recursive_directory_iterator(tmp)) {
-                if (p.is_regular_file()) {
-                    auto rel = std::filesystem::relative(p.path(), tmp).string();
-                    std::string dest = project_dir + "/" + rel;
-                    std::ifstream inf(p.path(), std::ios::binary);
-                    std::string content((std::istreambuf_iterator<char>(inf)), {});
-                    inf.close();
-                    tfs.create_dirs(std::filesystem::path(dest).parent_path().string());
-                    tfs.write_file(dest, content);
-                }
+        // Sync files back into the provided fs (which will be the loader HostContext fs in the test)
+        for (auto& p : std::filesystem::recursive_directory_iterator(tmp)) {
+            if (p.is_regular_file()) {
+                auto rel = std::filesystem::relative(p.path(), tmp).string();
+                std::string dest = project_dir + "/" + rel;
+                std::ifstream inf(p.path(), std::ios::binary);
+                std::string content((std::istreambuf_iterator<char>(inf)), {});
+                inf.close();
+                fs.create_dirs(std::filesystem::path(dest).parent_path().string());
+                fs.write_file(dest, content);
             }
         }
 
@@ -66,17 +64,19 @@ TEST_CASE("PluginLoader - BuiltinBuildSyncsToMemoryFS")
         return rc;
     };
 
-    // Attach a MemoryFileSystem as the plugin's HostContext filesystem
+    // Attach a MemoryFileSystem as the loader's HostContext filesystem
     auto memfs = std::make_unique<fs::MemoryFileSystem>();
     auto ctx = std::make_unique<HostContext>(std::move(memfs), nullptr);
-    loaded->host_context = std::move(ctx);
+    loader.set_host_context(std::move(ctx));
 
-    // Now call build adapter to build project 'memproj'
-    int rc = loaded->build_adapter("memproj", "", *loaded->host_context->filesystem, false, false, false);
+    // Now call build adapter to build project 'memproj' and pass the loader HostContext filesystem
+    HostContext* hc = loader.get_host_context();
+    REQUIRE(hc != nullptr);
+    int rc = loaded->build_adapter("memproj", "", *hc->filesystem, false, false, false);
     CHECK(rc == 0);
 
     // Verify MemoryFileSystem has the synced file
-    auto& fs = *loaded->host_context->filesystem;
+    auto& fs = *hc->filesystem;
     CHECK(fs.exists("memproj/output.bin"));
     auto content = fs.read_file("memproj/output.bin");
     CHECK(content == "BINARYDATA");

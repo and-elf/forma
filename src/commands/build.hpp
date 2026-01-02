@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../toml/toml.hpp"
+#include "../core/toml_io.hpp"
 #include "../plugin_loader.hpp"
 #include "../core/pipeline.hpp"
 #include "../parser/ir.hpp"
@@ -45,13 +45,15 @@ ProjectConfig read_project_config(const std::string& project_dir, forma::tracer:
         return config;
     }
     
-    tracer.verbose(std::string("Reading project configuration: ") + toml_path.string());
-    
-    // Read TOML file
-    std::string toml_content = fs.read_file(toml_path);
-    
-    // Parse TOML
-    auto doc = forma::toml::parse(toml_content);
+    tracer.verbose(std::string("Reading project configuration: ") + toml_path);
+
+    // Parse TOML using the provided IFileSystem
+    auto doc_opt = forma::core::parse_toml_from_fs(fs, toml_path);
+    if (!doc_opt) {
+        tracer.error("Failed to parse project configuration");
+        return config;
+    }
+    auto& doc = *doc_opt;
     
     // Get [build] table
     if (auto* build_table = doc.get_table("build")) {
@@ -66,15 +68,12 @@ ProjectConfig read_project_config(const std::string& project_dir, forma::tracer:
         }
     }
     
-    // Find all .fml files in src/ directory
-    // Source file discovery: naive approach using filesystem for now
-    std::filesystem::path src_dir(project_dir);
-    src_dir /= "src";
-    if (std::filesystem::exists(src_dir)) {
-        for (const auto& entry : std::filesystem::recursive_directory_iterator(src_dir)) {
-            if (entry.is_regular_file() && entry.path().extension() == ".fml") {
-                config.source_files.push_back(entry.path().string());
-            }
+    // Find all .fml files in src/ directory using IFileSystem
+    std::string src_root = project_dir + "/src";
+    auto all_files = fs.list_recursive(src_root);
+    for (const auto& f : all_files) {
+        if (f.size() >= 4 && f.substr(f.size() - 4) == ".fml") {
+            config.source_files.push_back(f);
         }
     }
     

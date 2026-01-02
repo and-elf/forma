@@ -2,6 +2,7 @@
 #include "cmake_downloader.hpp"
 #include <core/toolchain.hpp>
 #include <filesystem>
+#include <core/fs/i_file_system.hpp>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -53,7 +54,7 @@ void CMakeGenerator::init(BuildContext* ctx) {
     // Ensure cmake is available
     if (g_cmake_path.empty()) {
         add_diagnostic("Checking for CMake...", DiagnosticLevel::Info);
-        g_cmake_path = forma::cmake::CMakeDownloader::ensure_cmake_available();
+        g_cmake_path = forma::cmake::CMakeDownloader::ensure_cmake_available(std::string(project_dir), host);
         
         if (g_cmake_path.empty()) {
             add_diagnostic("Failed to find or download CMake", DiagnosticLevel::Error);
@@ -120,7 +121,10 @@ void CMakeGenerator::link(const char** /*object_files*/, int /*count*/, const ch
     // For CMake, linking is handled in the CMakeLists.txt
     // We just regenerate with the final target name
     if (output_binary) {
-        config_.target_name = std::filesystem::path(output_binary).stem().string();
+        forma::fs::RealFileSystem realfs;
+        std::string ob(output_binary);
+        // Use std::filesystem only for path parsing here (no IO) as it's harmless.
+        config_.target_name = std::filesystem::path(ob).stem().string();
     }
     
     std::string cmake_path = config_.output_dir + "/CMakeLists.txt";
@@ -156,9 +160,10 @@ void CMakeGenerator::set_config(const CMakeGeneratorConfig& config) {
 
 void CMakeGenerator::generate_cmakelists(const std::string& output_path) {
     // Ensure output directory exists
-    std::filesystem::path dir = std::filesystem::path(output_path).parent_path();
+    std::string dir = std::filesystem::path(output_path).parent_path().string();
     if (!dir.empty()) {
-        std::filesystem::create_directories(dir);
+        forma::fs::RealFileSystem realfs;
+        realfs.create_dirs(dir);
     }
 
     std::ofstream out(output_path);
@@ -315,7 +320,8 @@ bool CMakeGenerator::run_cmake_configure() {
     }
     
     // Create build directory
-    std::filesystem::create_directories(config_.output_dir);
+    forma::fs::RealFileSystem realfs_build;
+    realfs_build.create_dirs(config_.output_dir);
     
     // Run cmake configure
     std::string cmd = "cd \"" + config_.output_dir + "\" && \"" + g_cmake_path + "\" ";
@@ -455,26 +461,22 @@ extern "C" {
         config.target_name = "app";
         config.output_dir = "build";
         
-        // Load configuration from TOML if provided
-        if (config_path && std::filesystem::exists(config_path)) {
-            std::ifstream file(config_path);
-            std::ostringstream buffer;
-            buffer << file.rdbuf();
-            std::string toml_content = buffer.str();
-            
-            // Parse TOML
-            auto doc = forma::toml::parse(toml_content);
-            
-            // Get [cmake] section
-            if (auto* cmake_table = doc.get_table("cmake")) {
-                config.load_from_toml(*cmake_table);
-                
-                if (verbose) {
-                    std::cout << "Loaded CMake configuration:\n";
-                    std::cout << "  Project: " << config.project_name << "\n";
-                    std::cout << "  Target: " << config.target_name << "\n";
-                    std::cout << "  Build type: " << config.build_type << "\n";
-                    std::cout << "  C++ standard: " << config.cxx_standard << "\n";
+        // Load configuration from TOML if provided (via RealFileSystem helper)
+        if (config_path) {
+            forma::fs::RealFileSystem realfs;
+            if (realfs.exists(config_path)) {
+                auto doc_opt = forma::core::parse_toml_from_fs(realfs, config_path);
+            if (doc_opt) {
+                auto& doc = *doc_opt;
+                if (auto* cmake_table = doc.get_table("cmake")) {
+                    config.load_from_toml(*cmake_table);
+                    if (verbose) {
+                        std::cout << "Loaded CMake configuration:\n";
+                        std::cout << "  Project: " << config.project_name << "\n";
+                        std::cout << "  Target: " << config.target_name << "\n";
+                        std::cout << "  Build type: " << config.build_type << "\n";
+                        std::cout << "  C++ standard: " << config.cxx_standard << "\n";
+                    }
                 }
             }
         }
@@ -516,6 +518,76 @@ extern "C" {
             std::cout << "Build complete!\n";
         }
         
+        return 0;
+    }
+
+    // Host-aware build variant: accepts HostContext* as first parameter
+    int forma_build_host(void* host_ptr, const char* project_dir, const char* config_path, bool verbose, bool /*flash*/, bool /*monitor*/) {
+        auto* host = static_cast<forma::HostContext*>(host_ptr);
+        if (!project_dir) {
+            std::cerr << "Error: Invalid project directory\n";
+            return 1;
+        }
+
+        if (verbose) {
+            std::cout << "CMake build plugin (host-aware)\n";
+            std::cout << "Project: " << project_dir << "\n";
+            if (config_path) {
+                std::cout << "Config: " << config_path << "\n";
+            }
+        }
+
+        // Create generator instance
+        auto generator = std::make_unique<CMakeGenerator>();
+        CMakeGeneratorConfig config;
+        // defaults same as forma_build
+        config.cmake_minimum_version = "3.20";
+        config.cxx_standard = "20";
+        config.generator = "Ninja";
+        config.build_type = "Release";
+        config.project_name = "FormaProject";
+        config.target_name = "app";
+        config.output_dir = "build";
+
+        // Load configuration from TOML if provided using host filesystem or stream_io
+        if (config_path && host) {
+            if (host->filesystem && host->filesystem->exists(config_path)) {
+                auto doc_opt = forma::core::parse_toml_from_fs(*host->filesystem, config_path);
+                if (doc_opt) {
+                    auto& doc = *doc_opt;
+                    if (auto* cmake_table = doc.get_table("cmake")) {
+                        config.load_from_toml(*cmake_table);
+                    }
+                }
+            } else {
+                // try stream_io
+                if (host->stream_io.open_read(config_path)) {
+                    auto toml_str = *host->stream_io.open_read(config_path);
+                    auto doc = toml::parse<16>(toml_str);
+                    if (auto* cmake_table = doc.get_table("cmake")) {
+                        config.load_from_toml(*cmake_table);
+                    }
+                }
+            }
+        }
+
+        generator->set_config(config);
+        generator->init(nullptr);
+
+        std::string cmakelist_path = std::string(project_dir) + "/CMakeLists.txt";
+        if (verbose) std::cout << "Generating: " << cmakelist_path << "\n";
+        generator->generate_cmakelists(cmakelist_path);
+
+        if (!generator->run_cmake_configure()) {
+            std::cerr << "Error: CMake configuration failed\n";
+            return 1;
+        }
+        if (!generator->run_cmake_build()) {
+            std::cerr << "Error: Build failed\n";
+            return 1;
+        }
+
+        if (verbose) std::cout << "Build complete!\n";
         return 0;
     }
 }

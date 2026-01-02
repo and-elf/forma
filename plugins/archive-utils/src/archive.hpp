@@ -54,6 +54,16 @@ ExtractResult extract_archive(
     const ExtractOptions& options = ExtractOptions()
 );
 
+// Host-aware extract: extracts into a disk tempdir then copies into host filesystem
+bool forma_extract_host(void* host_ptr,
+    const std::string& archive_path,
+    const std::string& dest_dir,
+    const ExtractOptions& options = ExtractOptions()
+);
+
+// Extract archive from memory buffer into host filesystem
+bool forma_extract_from_memory_host(void* host_ptr, const char* data, size_t len, const std::string& dest_dir, int strip_components = 0);
+
 /**
  * List contents of an archive without extracting
  * 

@@ -59,19 +59,18 @@ int run_run_command(const RunOptions& opts) {
             toml_path = std::filesystem::path(project_dir) / "forma.toml";
         }
         
-        if (std::filesystem::exists(toml_path)) {
-            std::ifstream file(toml_path);
-            std::stringstream buffer;
-            buffer << file.rdbuf();
-            std::string toml_content = buffer.str();
-            auto doc = forma::toml::parse(toml_content);
-            
-            if (auto* project_table = doc.get_table("project")) {
-                if (auto val = project_table->get_string("name")) {
-                    executable_name = std::string(*val);
+            if (std::filesystem::exists(toml_path)) {
+                forma::fs::RealFileSystem realfs;
+                auto doc_opt = forma::core::parse_toml_from_fs(realfs, toml_path.string());
+                if (doc_opt) {
+                    auto& doc = *doc_opt;
+                    if (auto* project_table = doc.get_table("project")) {
+                        if (auto val = project_table->get_string("name")) {
+                            executable_name = std::string(*val);
+                        }
+                    }
                 }
             }
-        }
         
         // Determine executable path based on build system
         std::filesystem::path executable_path;

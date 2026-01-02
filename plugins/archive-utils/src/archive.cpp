@@ -4,10 +4,12 @@
 #include <iostream>
 #include <filesystem>
 #include <cstring>
+#include "../../src/core/host_context.hpp"
+#include "../../src/core/fs/fs_copy.hpp"
 
 namespace forma::archive {
 
-namespace fs = std::filesystem;
+using std::filesystem::path;
 
 // Helper to strip leading path components
 static std::string strip_path_components(const std::string& path, int components) {
@@ -40,8 +42,8 @@ ExtractResult extract_archive(
     // Create destination directory if requested
     if (options.create_dest_dir) {
         try {
-            fs::create_directories(dest_dir);
-        } catch (const fs::filesystem_error& e) {
+            std::filesystem::create_directories(dest_dir);
+        } catch (const std::filesystem::filesystem_error& e) {
             result.error_message = std::string("Failed to create destination directory: ") + e.what();
             return result;
         }
@@ -121,7 +123,7 @@ ExtractResult extract_archive(
         }
         
         // Construct full destination path
-        fs::path dest_path = fs::path(dest_dir) / stripped_path;
+            std::filesystem::path dest_path = std::filesystem::path(dest_dir) / stripped_path;
         archive_entry_set_pathname(entry, dest_path.string().c_str());
         
         // Write the entry
@@ -213,7 +215,7 @@ std::vector<std::string> list_archive(const std::string& archive_path) {
 
 ArchiveFormat detect_format(const std::string& archive_path) {
     // Simple detection based on file extension
-    fs::path p(archive_path);
+    std::filesystem::path p(archive_path);
     std::string ext = p.extension().string();
     std::string stem = p.stem().string();
     
@@ -231,3 +233,142 @@ ArchiveFormat detect_format(const std::string& archive_path) {
 }
 
 } // namespace forma::archive
+
+// Host-aware C wrappers
+extern "C" {
+
+bool forma_extract_from_memory_host(void* host_ptr, const char* data, size_t len, const std::string& dest_dir, int strip_components) {
+    if (!host_ptr || !data || len == 0) return false;
+    auto* host = static_cast<forma::HostContext*>(host_ptr);
+    if (!host || !host->filesystem) return false;
+
+    struct archive* a = archive_read_new();
+    if (!a) return false;
+    archive_read_support_format_all(a);
+    archive_read_support_filter_all(a);
+
+    int r = archive_read_open_memory(a, data, len);
+    if (r != ARCHIVE_OK) {
+        archive_read_free(a);
+        return false;
+    }
+
+    struct archive* ext = archive_write_disk_new();
+    int write_flags = ARCHIVE_EXTRACT_TIME |
+                      ARCHIVE_EXTRACT_PERM |
+                      ARCHIVE_EXTRACT_ACL |
+                      ARCHIVE_EXTRACT_FFLAGS;
+    archive_write_disk_set_options(ext, write_flags);
+
+    struct archive_entry* entry;
+    while (true) {
+        r = archive_read_next_header(a, &entry);
+        if (r == ARCHIVE_EOF) break;
+        if (r != ARCHIVE_OK) {
+            archive_read_free(a);
+            archive_write_free(ext);
+            return false;
+        }
+
+        const char* pathname = archive_entry_pathname(entry);
+        if (!pathname) continue;
+
+        // Handle strip components
+        std::string dest_path = std::string(pathname);
+        if (strip_components > 0) {
+            std::filesystem::path p(dest_path);
+            std::filesystem::path out;
+            int skip = strip_components;
+            for (auto it = p.begin(); it != p.end(); ++it) {
+                if (skip > 0) { --skip; continue; }
+                out /= *it;
+            }
+            dest_path = out.string();
+            if (dest_path.empty()) continue;
+        }
+
+        // Stream entry data directly into the host's StreamIO write stream if available
+        std::string full = dest_dir;
+        if (!full.empty() && full.back() != '/') full.push_back('/');
+        full += dest_path;
+
+        // Ensure parent directories
+        try {
+            auto parent = std::filesystem::path(full).parent_path().string();
+            if (!parent.empty()) host->filesystem->create_dirs(parent);
+        } catch(...) {}
+
+        auto writer = host->stream_io.open_write_stream(full);
+        if (!writer) {
+            // Fallback: try writing via write_file by buffering
+            std::string buffer;
+            const void* buff;
+            size_t size;
+            la_int64_t offset;
+            while (true) {
+                r = archive_read_data_block(a, &buff, &size, &offset);
+                if (r == ARCHIVE_EOF) break;
+                if (r != ARCHIVE_OK) {
+                    archive_read_free(a);
+                    archive_write_free(ext);
+                    return false;
+                }
+                buffer.append(static_cast<const char*>(buff), size);
+            }
+            try {
+                host->filesystem->write_file(full, buffer);
+            } catch(...) {}
+        } else {
+            const void* buff;
+            size_t size;
+            la_int64_t offset;
+            while (true) {
+                r = archive_read_data_block(a, &buff, &size, &offset);
+                if (r == ARCHIVE_EOF) break;
+                if (r != ARCHIVE_OK) {
+                    archive_read_free(a);
+                    archive_write_free(ext);
+                    return false;
+                }
+                writer->write(buff, size);
+            }
+        }
+    }
+
+    archive_read_close(a);
+    archive_read_free(a);
+    archive_write_close(ext);
+    archive_write_free(ext);
+
+    return true;
+}
+
+} // extern "C"
+
+// Host-aware C wrappers
+extern "C" {
+
+bool forma_extract_host(void* host_ptr, const char* archive_path_c, const char* dest_dir_c, const void* /*opts*/) {
+    if (!host_ptr || !archive_path_c || !dest_dir_c) return false;
+    auto* host = static_cast<forma::HostContext*>(host_ptr);
+    if (!host || !host->filesystem) return false;
+
+    namespace fs = std::filesystem;
+    fs::path tmp = fs::temp_directory_path() / ("forma_extract_" + std::to_string(std::time(nullptr)));
+    try { fs::create_directories(tmp); } catch(...) { return false; }
+
+    // Use existing extract_archive to extract into tmp
+    forma::archive::ExtractOptions opts;
+    bool ok = forma::archive::extract_archive(std::string(archive_path_c), tmp.string(), opts);
+    if (!ok) {
+        try { fs::remove_all(tmp); } catch(...) {}
+        return false;
+    }
+
+    bool copied = forma::fs::copy_disk_to_fs(tmp.string(), *host->filesystem, std::string(dest_dir_c));
+
+    try { fs::remove_all(tmp); } catch(...) {}
+    return copied;
+}
+
+} // extern "C"

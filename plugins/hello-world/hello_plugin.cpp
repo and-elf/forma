@@ -48,4 +48,11 @@ void forma_register(void* host) {
     std::cout << "[Hello Plugin] Plugin registered!\n";
 }
 
+// Host-aware registration example that can use HostContext
+void forma_register_host(void* host_ptr) {
+    auto* host = static_cast<forma::HostContext*>(host_ptr);
+    (void)host;
+    std::cout << "[Hello Plugin] Plugin registered with host!\n";
+}
+
 } // extern "C"

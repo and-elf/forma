@@ -11,6 +11,7 @@
 #include "plugin_metadata.hpp"
 #include "plugin_hash.hpp"
 #include "core/fs/i_file_system.hpp"
+#include "core/fs/fs_copy.hpp"
 #include "core/host_context.hpp"
 #include <random>
 #include <chrono>
@@ -23,6 +24,9 @@ struct PluginFunctions {
     bool (*render)(const void* doc, const char* input_path, const char* output_path);
     int (*build)(const char* project_dir, const char* config_path, bool verbose, bool flash, bool monitor);  // For build plugins
     void (*register_plugin)(void* host);  // Optional
+    // Host-aware variants: plugin may accept HostContext* as first param
+    bool (*render_with_host)(void* host, const void* doc, const char* input_path, const char* output_path);
+    int (*build_with_host)(void* host, const char* project_dir, const char* config_path, bool verbose, bool flash, bool monitor);
     uint64_t (*get_metadata_hash)();  // Required - returns hash of expected TOML
 };
 
@@ -45,7 +49,7 @@ struct LoadedPlugin {
     // High-level adapters generated at load time
     RendererAdapter renderer_adapter;
     BuildAdapter build_adapter;
-    std::unique_ptr<forma::HostContext> host_context;
+    // HostContext is owned by PluginLoader (shared across plugins)
     
     ~LoadedPlugin() {
         if (handle) {
@@ -71,12 +75,16 @@ struct IPluginLoader {
     virtual BuildAdapter get_build_adapter(const std::string& name) = 0;
     virtual LoadedPlugin* find_plugin(const std::string& name) = 0;
     virtual void print_loaded_plugins(std::ostream& out = std::cout) const = 0;
+    // HostContext accessors - default implementations may be no-ops
+    virtual void set_host_context(std::unique_ptr<HostContext> ctx) = 0;
+    virtual HostContext* get_host_context() = 0;
 };
 
 class PluginLoader : public IPluginLoader {
 private:
     std::vector<std::unique_ptr<LoadedPlugin>> loaded_plugins;
     std::vector<std::string> plugin_search_paths;  // Custom search paths
+    std::unique_ptr<HostContext> host_context; // owned by loader, shared/passed to plugins
     
 public:
     ~PluginLoader() = default;
@@ -97,11 +105,19 @@ public:
         typedef bool (*RenderFunc)(const void*, const char*, const char*);
         RenderFunc render_fn = reinterpret_cast<RenderFunc>(dlsym(handle, "forma_render"));
         dlerror(); // Clear error (it's optional)
+        // Host-aware render variant (optional)
+        typedef bool (*RenderHostFunc)(void*, const void*, const char*, const char*);
+        RenderHostFunc render_host_fn = reinterpret_cast<RenderHostFunc>(dlsym(handle, "forma_render_host"));
+        dlerror();
         
         // Look for the forma_build function (optional - for build plugins)
         typedef int (*BuildFunc)(const char*, const char*, bool, bool, bool);
         BuildFunc build_fn = reinterpret_cast<BuildFunc>(dlsym(handle, "forma_build"));
         dlerror(); // Clear error (it's optional)
+        // Host-aware build variant (optional)
+        typedef int (*BuildHostFunc)(void*, const char*, const char*, bool, bool, bool);
+        BuildHostFunc build_host_fn = reinterpret_cast<BuildHostFunc>(dlsym(handle, "forma_build_host"));
+        dlerror();
         
         // Plugin must have at least one function (render or build)
         if (!render_fn && !build_fn) {
@@ -174,11 +190,28 @@ public:
         loaded->functions.render = render_fn;
         loaded->functions.build = build_fn;
         loaded->functions.register_plugin = register_fn;
+        loaded->functions.render_with_host = reinterpret_cast<bool(*)(void*, const void*, const char*, const char*)>(render_host_fn);
+        loaded->functions.build_with_host = reinterpret_cast<int(*)(void*, const char*, const char*, bool, bool, bool)>(build_host_fn);
         loaded->functions.get_metadata_hash = hash_fn;
         loaded->path = path;
         loaded->metadata = std::move(metadata);
 
-        // Create adapters that bridge IFileSystem <-> plugin C ABI using temp files
+        // Save loaded plugin first (adapters will be created after registration so they can capture a stable pointer)
+        loaded_plugins.push_back(std::move(loaded));
+
+        // Retrieve the stored plugin pointer
+        LoadedPlugin* p = loaded_plugins.back().get();
+
+        // Call registration function if available; create and attach HostContext to loader and pass pointer to plugin
+        if (register_fn) {
+            // Ensure loader has a HostContext
+            if (!host_context) {
+                host_context = std::make_unique<HostContext>(std::make_unique<forma::fs::RealFileSystem>(), &forma::tracer::get_tracer());
+                    host_context->initialize_stream_io();
+            }
+            register_fn(static_cast<void*>(host_context.get()));
+        }
+
         // Helper to make a unique temp path
         auto make_temp = [](const std::string& suffix) {
             auto tdir = std::filesystem::temp_directory_path();
@@ -189,81 +222,108 @@ public:
             return (tdir / ("forma_plugin_" + std::to_string(now) + "_" + std::to_string(rnd) + suffix)).string();
         };
 
-        // Wrap render fn
+        // Create adapters that bridge IFileSystem <-> plugin C ABI using temp files
         if (render_fn) {
-            loaded->renderer_adapter = [render_fn, make_temp](const void* doc, const std::string& input_path, const std::string& output_path, forma::fs::IFileSystem& fs) -> bool {
+            // Capture the loader's HostContext pointer at adapter creation time
+            HostContext* hc = host_context.get();
+            p->renderer_adapter = [render_fn, make_temp, p, hc](const void* doc, const std::string& input_path, const std::string& output_path, forma::fs::IFileSystem& fs) -> bool {
                 try {
-                    // Create temp input file from fs
-                    std::string tmp_in = make_temp(".in");
-                    std::ofstream of(tmp_in, std::ios::binary);
-                    of << fs.read_file(input_path);
-                    of.close();
+                    // If loader has a host_context with StreamIO, use it for IO
+                    if (hc) {
+                        // Use the host's StreamIO for plugin-level IO
+                        const auto& plugin_io = hc->stream_io;
+                        try {
+                            if (!input_path.empty()) {
+                                auto in_contents_opt = fs.read_file(input_path);
+                                // Ensure parent dirs in plugin io
+                                auto parent = std::filesystem::path(input_path).parent_path().string();
+                                if (!parent.empty()) plugin_io.create_dirs(parent);
+                                plugin_io.open_write(input_path, in_contents_opt);
+                            }
+                        } catch (...) {}
 
-                    // Temp output file
-                    std::string tmp_out = make_temp(".out");
+                        bool ok = render_fn(doc, input_path.c_str(), output_path.c_str());
 
-                    bool ok = render_fn(doc, tmp_in.c_str(), tmp_out.c_str());
+                        if (ok) {
+                            try {
+                                // If plugin wrote output via its StreamIO, copy back
+                                if (plugin_io.open_read(output_path)) {
+                                    auto out_contents_opt = plugin_io.open_read(output_path);
+                                    if (out_contents_opt) {
+                                        auto out_parent = std::filesystem::path(output_path).parent_path().string();
+                                        if (!out_parent.empty()) fs.create_dirs(out_parent);
+                                        fs.write_file(output_path, *out_contents_opt);
+                                    }
+                                }
+                            } catch (...) {}
+                        }
 
-                    if (ok) {
-                        // Read tmp_out and write back into fs at output_path
-                        std::ifstream inf(tmp_out, std::ios::binary);
-                        std::string out_contents((std::istreambuf_iterator<char>(inf)), {});
-                        inf.close();
-                        fs.write_file(output_path, out_contents);
+                        return ok;
+                    } else {
+                        // Fallback: operate on temp disk files
+                        std::string tmp_in = make_temp(".in");
+                        std::ofstream of(tmp_in, std::ios::binary);
+                        of << fs.read_file(input_path);
+                        of.close();
+
+                        std::string tmp_out = make_temp(".out");
+                        bool ok = render_fn(doc, tmp_in.c_str(), tmp_out.c_str());
+
+                        if (ok) {
+                            std::ifstream inf(tmp_out, std::ios::binary);
+                            std::string out_contents((std::istreambuf_iterator<char>(inf)), {});
+                            inf.close();
+                            fs.write_file(output_path, out_contents);
+                        }
+
+                        std::error_code ec;
+                        std::filesystem::remove(tmp_in, ec);
+                        std::filesystem::remove(tmp_out, ec);
+                        return ok;
                     }
-
-                    // Cleanup
-                    std::error_code ec;
-                    std::filesystem::remove(tmp_in, ec);
-                    std::filesystem::remove(tmp_out, ec);
-                    return ok;
                 } catch (...) {
                     return false;
                 }
             };
         }
 
-        // Wrap build fn
         if (build_fn) {
-            loaded->build_adapter = [build_fn, make_temp, &loaded](const std::string& project_dir, const std::string& config_path, forma::fs::IFileSystem& fs, bool verbose, bool flash, bool monitor) -> int {
+            HostContext* hc = host_context.get();
+            p->build_adapter = [build_fn, make_temp, p, hc](const std::string& project_dir, const std::string& config_path, forma::fs::IFileSystem& fs, bool verbose, bool flash, bool monitor) -> int {
                 try {
                     // Create a temp project directory on disk
                     std::filesystem::path tmp_proj = std::filesystem::temp_directory_path() / ("forma_proj_" + std::to_string(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
                     std::filesystem::create_directories(tmp_proj);
 
-                    // If config_path exists in fs, write it to a temp file
+                    // If config_path exists in caller fs, write it to a temp file in tmp_proj
                     std::string tmp_config = (tmp_proj / "forma_plugin_config.toml").string();
                     try {
-                        auto cfg = fs.read_file(config_path);
-                        std::ofstream cof(tmp_config, std::ios::binary);
-                        cof << cfg;
-                        cof.close();
-                    } catch (...) {
-                        // ignore if not present
-                    }
+                        if (fs.exists(config_path)) {
+                            auto cfg = fs.read_file(config_path);
+                            std::ofstream cof(tmp_config, std::ios::binary);
+                            cof << cfg;
+                            cof.close();
+                        }
+                    } catch (...) {}
+
+                    // Copy caller fs into tmp_proj so plugin can build from disk
+                    // If fs is backed by in-memory filesystem, this mirrors files to disk
+                    forma::fs::copy_fs_to_disk(fs, project_dir, tmp_proj.string());
 
                     int rc = build_fn(tmp_proj.string().c_str(), tmp_config.c_str(), verbose, flash, monitor);
 
-                    // If plugin has an associated HostContext filesystem, sync outputs back into it
-                    if (loaded->host_context && loaded->host_context->filesystem) {
-                        auto& target_fs = *loaded->host_context->filesystem;
+                    // After build, copy disk outputs back into HostContext filesystem (if available) and caller fs
 
-                        // Recursively copy files from tmp_proj into target_fs under project_dir
-                        for (auto& p : std::filesystem::recursive_directory_iterator(tmp_proj)) {
-                            if (p.is_regular_file()) {
-                                auto rel = std::filesystem::relative(p.path(), tmp_proj).string();
-                                std::string dest = project_dir + "/" + rel;
-                                // Read file content
-                                std::ifstream inf(p.path(), std::ios::binary);
-                                std::string content((std::istreambuf_iterator<char>(inf)), {});
-                                inf.close();
-                                // Ensure directory exists in target fs
-                                auto parent = std::filesystem::path(dest).parent_path().string();
-                                target_fs.create_dirs(parent);
-                                target_fs.write_file(dest, content);
-                            }
-                        }
+                    // If loader has an associated HostContext filesystem, copy disk outputs back into it
+                    if (hc && hc->filesystem) {
+                        auto& target_fs = *hc->filesystem;
+                        forma::fs::copy_disk_to_fs(tmp_proj.string(), target_fs, project_dir);
                     }
+
+                    // Also copy disk outputs back into caller fs
+                    try {
+                        forma::fs::copy_disk_to_fs(tmp_proj.string(), fs, project_dir);
+                    } catch (...) {}
 
                     // Cleanup temp project directory
                     std::error_code ec;
@@ -273,16 +333,6 @@ public:
                     return -1;
                 }
             };
-        }
-
-        // Save loaded plugin first
-        loaded_plugins.push_back(std::move(loaded));
-
-        // Call registration function if available; create and attach HostContext to plugin
-        if (register_fn) {
-            auto ctx = std::make_unique<HostContext>(std::make_unique<forma::fs::RealFileSystem>(), &forma::tracer::get_tracer());
-            register_fn(static_cast<void*>(ctx.get()));
-            loaded->host_context = std::move(ctx);
         }
         
         return true;
@@ -448,11 +498,12 @@ public:
             };
         }
 
-        // Call register function for builtin if present
+        // Call register function for builtin if present (attach to loader-level host_context)
         if (loaded->functions.register_plugin) {
-            auto ctx = std::make_unique<HostContext>(std::make_unique<forma::fs::RealFileSystem>(), &forma::tracer::get_tracer());
-            loaded->functions.register_plugin(static_cast<void*>(ctx.get()));
-            loaded->host_context = std::move(ctx);
+            if (!host_context) {
+                host_context = std::make_unique<HostContext>(std::make_unique<forma::fs::RealFileSystem>(), &forma::tracer::get_tracer());
+            }
+            loaded->functions.register_plugin(static_cast<void*>(host_context.get()));
         }
 
         loaded_plugins.push_back(std::move(loaded));
@@ -461,6 +512,15 @@ public:
     // Get all loaded plugins
     const std::vector<std::unique_ptr<LoadedPlugin>>& get_loaded_plugins() const {
         return loaded_plugins;
+    }
+
+    // HostContext ownership: set/get
+    void set_host_context(std::unique_ptr<HostContext> ctx) override {
+        host_context = std::move(ctx);
+    }
+
+    HostContext* get_host_context() override {
+        return host_context.get();
     }
 
     // Get adapters for a plugin by name (returns null if not available)

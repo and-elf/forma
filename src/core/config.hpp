@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <optional>
 #include <fstream>
-#include <toml/toml.hpp>
+#include "core/toml_io.hpp"
 
 namespace forma::config {
 
@@ -73,18 +73,12 @@ inline ProjectConfig load_project_config(const std::string& project_root = ".") 
         return config;
     }
     
-    // Read TOML file
-    std::ifstream file(toml_path);
-    if (!file) {
-        return config;
-    }
-    
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string content = buffer.str();
-    
-    auto doc = forma::toml::parse(content);
-    
+    // Read TOML file via RealFileSystem + core helper
+    forma::fs::RealFileSystem realfs;
+    auto doc_opt = forma::core::parse_toml_from_fs(realfs, toml_path.string());
+    if (!doc_opt) return config;
+    auto& doc = *doc_opt;
+
     // Parse [toolchains] section
     auto toolchains_table = doc.get_table("toolchains");
     if (toolchains_table) {

@@ -34,6 +34,15 @@ static size_t write_to_memory(void* ptr, size_t size, size_t nmemb, void* userda
     return size * nmemb;
 }
 
+// Callback for writing to a generic writer (IWriteStream)
+static size_t write_to_stream(void* ptr, size_t size, size_t nmemb, void* userdata) {
+    auto* wptr = static_cast<forma::io::IWriteStream*>(userdata);
+    if (!wptr) return 0;
+    size_t bytes = size * nmemb;
+    wptr->write(ptr, bytes);
+    return bytes;
+}
+
 // Progress callback wrapper
 struct ProgressData {
     ProgressCallback callback;
@@ -96,7 +105,8 @@ DownloadResult download_file(const std::string& url, const std::string& output_p
     
     if (res != CURLE_OK) {
         result.error_message = curl_easy_strerror(res);
-        std::filesystem::remove(output_path); // Clean up partial file
+        forma::fs::RealFileSystem realfs;
+        if (realfs.exists(output_path)) std::remove(output_path.c_str());
         return result;
     }
     
@@ -113,7 +123,8 @@ DownloadResult download_file(const std::string& url, const std::string& output_p
     // Check for HTTP errors
     if (response_code >= 400) {
         result.error_message = "HTTP error " + std::to_string(response_code);
-        std::filesystem::remove(output_path);
+        forma::fs::RealFileSystem realfs;
+        if (realfs.exists(output_path)) std::remove(output_path.c_str());
         return result;
     }
     
@@ -151,6 +162,39 @@ std::optional<std::string> download_to_memory(const std::string& url, const Down
     }
     
     return content;
+}
+
+bool download_to_stream(const std::string& url, OpenWriteStreamFn writer_fn, const DownloadOptions& options) {
+    CurlHandle curl;
+    if (!curl.valid()) return false;
+
+    auto writer_ptr = writer_fn(url); // caller may ignore the argument but we need a writer for path
+    if (!writer_ptr) return false;
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_to_stream);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, writer_ptr.get());
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, options.follow_redirects ? 1L : 0L);
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, static_cast<long>(options.max_redirects));
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, static_cast<long>(options.timeout_seconds));
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, options.user_agent.c_str());
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, options.verify_ssl ? 1L : 0L);
+
+    ProgressData progress_data{options.progress_callback};
+    if (options.progress_callback) {
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progress_callback);
+        curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &progress_data);
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    }
+
+    CURLcode res = curl_easy_perform(curl);
+    if (res != CURLE_OK) return false;
+
+    long response_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+    if (response_code >= 400) return false;
+
+    return true;
 }
 
 bool extract_archive(const std::string& archive_path, const std::string& output_dir, 
@@ -211,7 +255,7 @@ bool download_and_extract(const std::string& url, const std::string& output_dir,
     
     // Clean up temp file
     try {
-        fs::remove(temp_file);
+        if (std::filesystem::exists(temp_file)) std::filesystem::remove(temp_file);
     } catch (...) {
         std::cerr << "Warning: Failed to remove temporary file: " << temp_file << "\n";
     }
@@ -220,3 +264,85 @@ bool download_and_extract(const std::string& url, const std::string& output_dir,
 }
 
 } // namespace forma::download
+
+// Host-aware C exported wrappers
+#include "../../src/core/host_context.hpp"
+#include "../../src/core/fs/fs_copy.hpp"
+
+extern "C" {
+
+bool forma_download_host(void* host_ptr, const char* url_c, const char* output_path_c, const void* /*options_ptr*/) {
+    if (!host_ptr || !url_c || !output_path_c) return false;
+    auto* host = static_cast<forma::HostContext*>(host_ptr);
+    if (!host || !host->filesystem) return false;
+    forma::download::DownloadOptions opts;
+    return forma_download_to_stream_host(host_ptr, std::string(url_c), std::string(output_path_c), opts);
+}
+
+bool forma_download_to_stream_host(void* host_ptr, const std::string& url, const std::string& output_path, const DownloadOptions& options) {
+    if (!host_ptr) return false;
+    auto* host = static_cast<forma::HostContext*>(host_ptr);
+    if (!host || !host->filesystem) return false;
+
+    // Create a writer closure that ignores the incoming path and uses output_path
+    auto writer_fn = [host, output_path](const std::string& /*p*/) -> forma::io::WriteStreamPtr {
+        return host->stream_io.open_write_stream(output_path);
+    };
+
+    return download_to_stream(url, writer_fn, options);
+}
+
+bool forma_extract_host(void* host_ptr, const char* archive_path_c, const char* output_dir_c, int strip_components) {
+    if (!host_ptr || !archive_path_c || !output_dir_c) return false;
+    auto* host = static_cast<forma::HostContext*>(host_ptr);
+    if (!host || !host->filesystem) return false;
+
+    namespace fs = std::filesystem;
+    fs::path tmpdir = fs::temp_directory_path() / ("forma_extract_" + std::to_string(std::time(nullptr)));
+    try { fs::create_directories(tmpdir); } catch(...) { return false; }
+
+    bool ok = forma::download::extract_archive(std::string(archive_path_c), tmpdir.string(), strip_components);
+    if (!ok) {
+        try { fs::remove_all(tmpdir); } catch(...) {}
+        return false;
+    }
+
+    bool copied = forma::fs::copy_disk_to_fs(tmpdir.string(), *host->filesystem, std::string(output_dir_c));
+
+    try { fs::remove_all(tmpdir); } catch(...) {}
+    return copied;
+}
+
+bool forma_download_and_extract_host(void* host_ptr, const char* url_c, const char* output_dir_c, int strip_components, const void* /*opts*/) {
+    if (!host_ptr || !url_c || !output_dir_c) return false;
+    auto* host = static_cast<forma::HostContext*>(host_ptr);
+    if (!host || !host->filesystem) return false;
+    forma::download::DownloadOptions opts;
+    // Stream download into a temporary in-memory buffer? Instead, download to a temporary
+    // memory-backed path inside host filesystem and then call memory-extract using in-memory bytes.
+    // We'll stream into a host filesystem path and then read it back into memory for extraction.
+    std::string tmp_path = std::string(output_dir_c);
+    if (!tmp_path.empty() && tmp_path.back() != '/') tmp_path.push_back('/');
+    tmp_path += "__download_tmp_archive";
+    // Ensure parent dir exists
+    try {
+        auto parent = std::filesystem::path(tmp_path).parent_path().string();
+        if (!parent.empty()) host->filesystem->create_dirs(parent);
+    } catch(...) {}
+
+    bool ok = forma_download_to_stream_host(host_ptr, std::string(url_c), tmp_path, opts);
+    if (!ok) return false;
+
+    // Read back into memory and extract via memory-extract
+    std::string data;
+    try {
+        data = host->filesystem->read_file(tmp_path);
+    } catch(...) { return false; }
+
+    extern bool forma_extract_from_memory_host(void* host_ptr, const char* data, size_t len, const char* dest_dir, int strip_components);
+    bool ex_ok = forma_extract_from_memory_host(host_ptr, data.data(), data.size(), output_dir_c, strip_components);
+
+    return ex_ok;
+}
+
+} // extern "C"

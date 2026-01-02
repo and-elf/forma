@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../toml/toml.hpp"
+#include "../core/toml_io.hpp"
 #include "../plugin_loader.hpp"
 #include "../../plugins/tracer/src/tracer_plugin.hpp"
 #include <string>
@@ -52,19 +52,14 @@ ProjectInfo read_deploy_config(const std::string& project_dir, forma::tracer::Tr
     
     tracer.verbose(std::string("Reading project configuration: ") + toml_path.string());
     
-    // Read TOML file
-    std::ifstream file(toml_path);
-    if (!file.is_open()) {
-        tracer.error(std::string("Failed to open: ") + toml_path.string());
+    // Parse TOML via RealFileSystem helper
+    forma::fs::RealFileSystem realfs;
+    auto doc_opt = forma::core::parse_toml_from_fs(realfs, toml_path.string());
+    if (!doc_opt) {
+        tracer.error(std::string("Failed to read/parse: ") + toml_path.string());
         return {};
     }
-    
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string toml_content = buffer.str();
-    
-    // Parse TOML
-    auto doc = forma::toml::parse(toml_content);
+    auto& doc = *doc_opt;
     
     ProjectInfo info;
     

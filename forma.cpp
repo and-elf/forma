@@ -11,7 +11,7 @@
 #include "src/commands/run.hpp"
 #include "plugins/tracer/src/tracer_plugin.hpp"
 #include "plugins/lvgl-renderer/src/lvgl_renderer_builtin.hpp"
-#include "src/toml/toml.hpp"
+#include "src/core/toml_io.hpp"
 #include <CLI/CLI.hpp>
 #include <iostream>
 #include <fstream>
@@ -206,15 +206,20 @@ int main(int argc, char* argv[]) {
     try {
         std::filesystem::path config_path = std::filesystem::current_path() / "forma.toml";
         if (std::filesystem::exists(config_path)) {
-            std::ifstream config_file(config_path);
-            std::string config_content((std::istreambuf_iterator<char>(config_file)), std::istreambuf_iterator<char>());
-            auto toml_doc = forma::toml::parse(config_content);
-            if (auto pkg = toml_doc.get_table("package")) {
-                if (auto ver = pkg->get_string("version")) {
-                    app_version = std::string(*ver);
+            forma::fs::RealFileSystem realfs;
+            std::string content;
+            if (forma::core::read_toml_file(realfs, config_path.string(), content)) {
+                auto toml_doc_opt = forma::core::parse_toml_from_fs(realfs, config_path.string());
+                if (toml_doc_opt) {
+                    auto& toml_doc = *toml_doc_opt;
+                    if (auto pkg = toml_doc.get_table("package")) {
+                        if (auto ver = pkg->get_string("version")) {
+                            app_version = std::string(*ver);
+                        }
+                    } else if (auto ver = toml_doc.root.get_string("version")) {
+                        app_version = std::string(*ver);
+                    }
                 }
-            } else if (auto ver = toml_doc.root.get_string("version")) {
-                app_version = std::string(*ver);
             }
         }
     } catch (...) {

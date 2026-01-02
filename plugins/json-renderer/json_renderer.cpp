@@ -115,6 +115,73 @@ bool forma_render(const void* doc_ptr, const char* input_path, const char* outpu
     }
 }
 
+// Host-aware render variant: accepts HostContext* as first parameter
+bool forma_render_host(void* host_ptr, const void* doc_ptr, const char* input_path, const char* output_path) {
+    auto* host = static_cast<forma::HostContext*>(host_ptr);
+    // Reuse existing implementation but write via host->stream_io when available
+    if (!doc_ptr || !output_path) {
+        std::cerr << "[JSON Renderer] Error: null pointer passed to render\n";
+        return false;
+    }
+
+    try {
+        const auto* doc = static_cast<const forma::Document<32,16,16,32,64,64>*>(doc_ptr);
+        std::ostringstream json;
+        json << "{\n";
+        json << "  \"types\": [\n";
+        for (size_t i = 0; i < doc->type_count; ++i) {
+            const auto& type = doc->types[i];
+            json << "    {\n";
+            json << "      \"name\": \"" << std::string(type.name.data(), type.name.size()) << "\",\n";
+            json << "      \"base\": \"" << std::string(type.base_type.data(), type.base_type.size()) << "\",\n";
+            json << "      \"property_count\": " << type.prop_count << ",\n";
+            json << "      \"method_count\": " << type.method_count << "\n";
+            json << "    }";
+            if (i < doc->type_count - 1) json << ",";
+            json << "\n";
+        }
+        json << "  ],\n";
+        json << "  \"instances\": [\n";
+        for (size_t i = 0; i < doc->instances.count; ++i) {
+            const auto& inst = doc->instances.instances[i];
+            json << "    {\n";
+            json << "      \"type\": \"" << std::string(inst.type_name.data(), inst.type_name.size()) << "\",\n";
+            json << "      \"property_count\": " << inst.prop_count << ",\n";
+            json << "      \"child_count\": " << inst.child_count << "\n";
+            json << "    }";
+            if (i < doc->instances.count - 1) json << ",";
+            json << "\n";
+        }
+        json << "  ],\n";
+        json << "  \"type_count\": " << doc->type_count << ",\n";
+        json << "  \"instance_count\": " << doc->instances.count << ",\n";
+        json << "  \"enum_count\": " << doc->enum_count << ",\n";
+        json << "  \"import_count\": " << doc->import_count << "\n";
+        json << "}\n";
+
+        if (host) {
+            if (host->stream_io.open_write(output_path, json.str())) {
+                std::cout << "[JSON Renderer] Generated " << json.str().size() << " bytes to " << output_path << "\n";
+                return true;
+            }
+            // fallback to file
+        }
+
+        std::ofstream out(output_path);
+        if (!out) {
+            std::cerr << "[JSON Renderer] Error: cannot write to " << output_path << "\n";
+            return false;
+        }
+        out << json.str();
+        out.close();
+        std::cout << "[JSON Renderer] Generated " << json.str().size() << " bytes to " << output_path << "\n";
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "[JSON Renderer] Error: " << e.what() << "\n";
+        return false;
+    }
+}
+
 // Optional registration function
 void forma_register(void* host) {
     (void)host; // Unused for now

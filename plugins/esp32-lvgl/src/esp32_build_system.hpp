@@ -70,8 +70,9 @@ public:
             "/opt/esp-idf"
         };
         
+        forma::fs::RealFileSystem realfs;
         for (const auto& path : common_paths) {
-            if (std::filesystem::exists(path + "/export.sh")) {
+            if (realfs.exists(path + "/export.sh")) {
                 config.idf_path = path;
                 std::cout << "Found ESP-IDF at: " << path << "\n";
                 return true;
@@ -135,8 +136,9 @@ public:
         }
         
         // Create project structure
-        std::filesystem::create_directories(project_path + "/main");
-        std::filesystem::create_directories(project_path + "/components");
+        forma::fs::RealFileSystem realfs;
+        realfs.create_dirs(project_path + "/main");
+        realfs.create_dirs(project_path + "/components");
         
         // Generate CMakeLists.txt (root)
         generate_root_cmake();
